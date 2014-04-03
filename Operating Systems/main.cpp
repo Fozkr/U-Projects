@@ -1,122 +1,173 @@
+/* This program works as a "code cleaner", it reads source code (both from standard input or files)
+ * and looks for unnecessary characters to be eliminated or the lack of necessary characters.
+ * This needs are predefined according to a specific style explained in the documentation.
+ * by Oscar Esquivel Oviedo, B22410, UCR
+ * v2.0, 2/4/2014
+ */
+
 #include <fstream>
 #include <iostream>
 using namespace std;
 
-bool checkParameter(char* parameter, bool& inputFile, bool& outputFile, short unsigned& spaceAmount);
-bool cleanCode(istream* input, ostream* output);
+bool checkParameters(const int argc, char* argv[], ifstream& inputFile, ofstream& outputFile, short unsigned& spaceAmount);
+bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount);
+void checkIndentation(string& line, char& currentChar, short unsigned& currentPos, short unsigned& indentationLevel, const short unsigned& spaceAmount);
 
 int main(int argc, char* argv[])
 {
-    //Initial boolean variables that indicate wether or not we'll be handling files
-    bool inputFileSpecified = false;
-    bool outputFileSpecified = false;
-    short unsigned spaceAmount = 4; //plus a little variable to handle the indentation space, default 4
+    //Initial necessary variables
+    short unsigned spaceAmount = 4; //A little variable to handle the indentation space, default 4
+    ifstream inputFile; //and file streams just in case we will have to handle files
+    ofstream outputFile; //they will be opened in "checkParameters" if so
 
-    //First check the parameters
-    for(short unsigned i=1; i<argc; ++i)
+    //First check the parameters, this program does not really validate the parameters
+    bool recognized = checkParameters(argc, argv, inputFile, outputFile, spaceAmount);
+    if(!recognized)
     {
-        //if(!(checkParameter(argv[i], inputFile, outputFile, spaceAmount)));
-        bool recognized = checkParameter(argv[i], inputFileSpecified, outputFileSpecified, spaceAmount); //returns if the parameter was recognized or not
-        if(!recognized)
-        {
-            cout << "Invalid parameter: '" << argv[i] << "'\nTerminating program";
-            return 0;
-        }
-        if(outputFileSpecified) ++i; //the "-o" should be followed by the file name, so it should ignore it and assume it is a file name
+        if(inputFile.is_open()) inputFile.close();
+        if(outputFile.is_open()) outputFile.close();
+        return 0;
     }
 
-    cout << inputFileSpecified << ' ' << outputFileSpecified << ' ' << spaceAmount << endl; //*****
+    cout << inputFile.is_open() << ' ' << outputFile.is_open() << ' ' << spaceAmount << endl; //*****
 
     //Then let us identify the stream we will be using
     istream* inputStream = &cin;
     ostream* outputStream = &cout;
-    ifstream inputFile;
-    ofstream outputFile;
-    if(inputFileSpecified)
-    {
-        inputFile.open(argv[1]);
+    if(inputFile.is_open())
         inputStream = &inputFile;
-    }
-    if(outputFileSpecified)
-    {
-        outputFile.open(argv[2]);
+    if(outputFile.is_open())
         outputStream = &outputFile;
-    }
 
     //Then let us start reading from that stream, but using a separate function
-    //cleanCode(inputStream, outputStream);
+    cleanCode(inputStream, outputStream, spaceAmount);
 
-    if(inputFileSpecified)
+    if(inputFile.is_open())
         inputFile.close();
-    if(outputFileSpecified)
+    if(outputFile.is_open())
         outputFile.close();
 
     return 0;
 }
 
 //Tries to quickly recognize the parameters sent to the program, does not check if files exist
-bool checkParameter(char* parameter, bool& inputFile, bool& outputFile, short unsigned& spaceAmount)
+bool checkParameters(const int argc, char* argv[], ifstream& inputFile, ofstream& outputFile, short unsigned& spaceAmount)
 {
-    cout << parameter << endl; //*****
-    if(parameter[0] == '-')
+    bool recognized = true;
+    for(short unsigned i=1; i<argc; ++i)
     {
-        switch(parameter[1])
+        cout << argv[i] << endl; //*****
+        if(argv[i][0] == '-')
         {
-            case 'e':
-                spaceAmount = parameter[2] - 48; //Should be followed by the amount of spaces, only values from 0 to 9 accepted
-                break;
-            case 'o':
-                outputFile = true; //does not check if it exists, that will be checked in the main
-                break;
-            default:
-                return false;
+            switch(argv[i][1])
+            {
+                case 'e':
+                    spaceAmount = argv[i][2] - 48; //Should be immediatly followed by the amount of spaces, only values from 0 to 9 accepted
+                    break;
+                case 'o':
+                    outputFile.open(argv[++i]); //Should be followed by the file name, so that next parameter should be ignored in the next loop
+                    break;
+                default:
+                    recognized = false; //Any other -x option is not recognized
+            }
+        }
+        else
+            inputFile.open(argv[i]); //If it does not start with a '-', it is assumed it is the input file name
+        if(!recognized || i>4) //There should not be more than 5 arguments, and they all should be recognized, report if otherwise
+        {
+            cout << "Invalid parameter: '" << argv[i] << "'\nTerminating program";
+            return false;
         }
     }
-    else
-        inputFile = true; //does not check if it exists, that will be checked in the main
-
     return true;
 }
 
-bool cleanCode(istream* input, ostream* output)
+bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount)
 {
-    //char line[256];
     string line;
     short unsigned indentationLevel = 0;
-    short unsigned spaceAmount = 0;
-    short spaceNeeded = 0;
-    while(!input->eof()) //Read the line, then analyze each character in it, then write it
+    short unsigned currentPos = 0;
+    char currentChar = '\0';
+    while(!input->eof()) //Read the line, analyze each character in it, then write it, until the eof is reached
     {
-        //input->getline(line, 256);
-        getline(*input, line);
-        char currentChar = '\0';
-        spaceAmount = 0;
-        for(unsigned short i=0; (currentChar = line[i])!='\0'; ++i)
+        getline(*input, line); cout << line << endl; //*****
+        //currentChar = '\0';
+        currentPos = 0;
+
+        //First, check indentation
+        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
+//        for(; (currentChar = line[currentPos])==' '; ++currentPos)
+//            ++spaces;
+//        if(line[currentPos] == '}')
+//            --indentationLevel;
+//        spacesNeeded = indentationLevel*spaceAmount - spaces;
+//        cout << "spaces needed: " << spacesNeeded << endl; //*****
+//        if(spacesNeeded > 0)
+//            line.insert(0, spacesNeeded, ' ');
+//        else if(spacesNeeded < 0)
+//            line.erase(0, spacesNeeded*-1);
+//        currentPos += spacesNeeded; //if spaces were inserted or deleted, move the currentPos pointer accordingly
+
+        //Second, check the rest
+        for(; (currentChar = line[currentPos])!='\0'; ++currentPos)
         {
+            //cout << currentChar << endl; //*****
             switch(currentChar)
             {
-                case '{':
+                case '/':
+                    if(line[currentPos+1] == '/') //If it starts with "//" it is a comment, leave it alone
+                        currentPos = line.size();
+                    break;
+                case '"':
+                    ++currentPos;
+                    while(line[currentPos] != '"')
+                        ++currentPos; //fast forward until the end of the string
+                    ++currentPos;
+                    break;
+                case '{': //TODO: tell that if it isn't the first char in the line, then put a \n before it
                     ++indentationLevel;
-                    ++spaceAmount; //The { symbol should not be indented
-                    cout << indentationLevel << endl;
+                    if(line[++currentPos] != '\0')
+                    {
+                        line.insert(currentPos++, 1, '\n');
+                        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
+                    }
+                    cout << indentationLevel << endl; //*****
                     break;
-                case '}':
+                case '}': //TODO: insert both \n before and after where appropiate
                     --indentationLevel;
-                    cout << indentationLevel << endl;
+                    cout << indentationLevel << endl; //*****
                     break;
-                case '\t':
-                    ++spaceAmount;
-                    cout << "sA: " << spaceAmount << endl;
+                case ' ':
+                    while(line[currentPos+1] == ' ') //Only leave one space, no more than one
+                    {
+                        cout << "SPACE" << endl; //*****
+                        line.erase(currentPos+1, 1);
+                    }
                     break;
                 default:
                     break;
             }
         }
-        spaceNeeded = indentationLevel - spaceAmount;
-        cout << "space needed: " << spaceNeeded << endl;
         (*output) << line << endl;
-        if(spaceNeeded > 0)
-            line.insert(0, 3, '.');
     }
     return false;
+}
+
+void checkIndentation(string& line, char& currentChar, short unsigned& currentPos, short unsigned& indentationLevel, const short unsigned& spaceAmount)
+{
+    short unsigned spaces = 0;
+    short spacesNeeded = 0;
+    for(; (currentChar = line[currentPos])==' '; ++currentPos)
+            ++spaces;
+    if(line[currentPos] == '}')
+        --indentationLevel;
+    spacesNeeded = indentationLevel*spaceAmount - spaces;
+    cout << "spaces needed: " << spacesNeeded << endl; //*****
+    if(spacesNeeded > 0)
+        line.insert(currentPos, spacesNeeded, ' ');
+    else if(spacesNeeded < 0)
+        line.erase(currentPos, spacesNeeded*-1);
+    currentPos += spacesNeeded; //if spaces were inserted or deleted, move the currentPos pointer accordingly
+    if(line[currentPos] == '}')
+        ++currentPos; //ignore the '}' char after indentation
 }
