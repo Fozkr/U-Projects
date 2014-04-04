@@ -10,7 +10,7 @@
 using namespace std;
 
 bool checkParameters(const int argc, char* argv[], ifstream& inputFile, ofstream& outputFile, short unsigned& spaceAmount);
-bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount);
+bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount, short unsigned* wordsCount);
 void checkIndentation(string& line, char& currentChar, short unsigned& currentPos, short unsigned& indentationLevel, const short unsigned& spaceAmount);
 
 int main(int argc, char* argv[])
@@ -31,6 +31,15 @@ int main(int argc, char* argv[])
 
     cout << inputFile.is_open() << ' ' << outputFile.is_open() << ' ' << spaceAmount << endl; //*****
 
+    //Second, create an array with all the reserved words to be identified and another one to count those
+    string reservedWords[] = {"bool", "break", "case", "catch", "char", "class", "const", "continue", "default",
+    "delete", "do", "double", "else", "enum", "explicit", "extern", "false", "float", "for", "friend", "if",
+    "inline", "int", "long", "namespace", "new", "operator", "private", "protected", "public", "register",
+    "return", "short", "signed", "sizeof", "static", "struct", "switch", "template", "true", "try", "typedef",
+    "typeid", "typename", "unsigned", "using", "virtual", "void", "volatile", "while"};
+    short unsigned wordsCount[50] = {0};
+    //TODO: count the words in the cleanCode function!!!
+
     //Then let us identify the stream we will be using
     istream* inputStream = &cin;
     ostream* outputStream = &cout;
@@ -40,7 +49,7 @@ int main(int argc, char* argv[])
         outputStream = &outputFile;
 
     //Then let us start reading from that stream, but using a separate function
-    cleanCode(inputStream, outputStream, spaceAmount);
+    cleanCode(inputStream, outputStream, spaceAmount, wordsCount);
 
     if(inputFile.is_open())
         inputFile.close();
@@ -82,7 +91,8 @@ bool checkParameters(const int argc, char* argv[], ifstream& inputFile, ofstream
     return true;
 }
 
-bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount)
+//Analyzes the input, line by line, char by char, looking for unnecesary spaces or the lack of them
+bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount, short unsigned* wordsCount)
 {
     string line;
     short unsigned indentationLevel = 0;
@@ -90,67 +100,102 @@ bool cleanCode(istream* input, ostream* output, const short unsigned spaceAmount
     char currentChar = '\0';
     while(!input->eof()) //Read the line, analyze each character in it, then write it, until the eof is reached
     {
-        getline(*input, line); cout << line << endl; //*****
-        //currentChar = '\0';
+        getline(*input, line);
+        cout << line << endl; //*****
         currentPos = 0;
 
-        //First, check indentation
-        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
-//        for(; (currentChar = line[currentPos])==' '; ++currentPos)
-//            ++spaces;
-//        if(line[currentPos] == '}')
-//            --indentationLevel;
-//        spacesNeeded = indentationLevel*spaceAmount - spaces;
-//        cout << "spaces needed: " << spacesNeeded << endl; //*****
-//        if(spacesNeeded > 0)
-//            line.insert(0, spacesNeeded, ' ');
-//        else if(spacesNeeded < 0)
-//            line.erase(0, spacesNeeded*-1);
-//        currentPos += spacesNeeded; //if spaces were inserted or deleted, move the currentPos pointer accordingly
+        //First, check indentation, except in empty lines (less storage space)
+        if(line.size() > 0)
+            checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
 
-        //Second, check the rest
+        //Second, check the rest of the line
         for(; (currentChar = line[currentPos])!='\0'; ++currentPos)
         {
             //cout << currentChar << endl; //*****
             switch(currentChar)
             {
                 case '/':
+                    cout << "'" << line[currentPos+1] << "'" << endl;
                     if(line[currentPos+1] == '/') //If it starts with "//" it is a comment, leave it alone
-                        currentPos = line.size();
+                        //currentPos = line.size(); //does not work if spaces were added before, apparently
+                    {
+                        while(line[currentPos] != '\0')
+                            ++currentPos;
+                    }
                     break;
                 case '"':
                     ++currentPos;
-                    while(line[currentPos] != '"')
+                    while(line[currentPos] != '"' || line[currentPos-1] == '\\') //just in case there is a \" in the string
                         ++currentPos; //fast forward until the end of the string
                     ++currentPos;
                     break;
-                case '{': //TODO: tell that if it isn't the first char in the line, then put a \n before it
-                    ++indentationLevel;
-                    if(line[++currentPos] != '\0')
+                case '{':
+                    if(currentPos != (indentationLevel*spaceAmount)) //if it is not starting the line, it should be
                     {
+                        line.insert(currentPos++, 1, '\n');
+                        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
+                    }
+                    ++indentationLevel;
+                    if(line[currentPos+1] != '\0') //if it is not ending the line, it should be
+                    {
+                        ++currentPos;
                         line.insert(currentPos++, 1, '\n');
                         checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
                     }
                     cout << indentationLevel << endl; //*****
                     break;
-                case '}': //TODO: insert both \n before and after where appropiate
-                    --indentationLevel;
-                    cout << indentationLevel << endl; //*****
+                case '}':
+                    if(currentPos != (indentationLevel*spaceAmount)) //if it is not starting the line, it should be
+                    {
+                        cout << line << endl; //******
+                        cout << currentPos << "'" << line[currentPos-3] << line[currentPos-2] << line[currentPos-1] << line[currentPos] << "'" << endl; //*****
+                        line.insert(currentPos++, 1, '\n');
+                        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
+                    }
+                    if(line[currentPos+1] != '\0') //if it is not ending the line, it should be
+                    {
+                        ++currentPos;
+                        line.insert(currentPos++, 1, '\n');
+                        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
+                    }
                     break;
                 case ' ':
                     while(line[currentPos+1] == ' ') //Only leave one space, no more than one
                     {
-                        cout << "SPACE" << endl; //*****
+                        cout << "SPACE" << endl;
                         line.erase(currentPos+1, 1);
                     }
                     break;
+                case ';':
+                    if(line[currentPos+1]!='\0' && line[currentPos+1]!='\n' && line[currentPos+1]!='}') //if it is not ending the line, it should be
+                    {
+                        ++currentPos;
+                        line.insert(currentPos++, 1, '\n');
+                        checkIndentation(line, currentChar, currentPos, indentationLevel, spaceAmount);
+                        --currentPos;
+                    }
+                    break;
+                case '=':
+                    if(line[currentPos-1] != ' ')
+                        line.insert(currentPos++, 1, ' ');
+                    if(line[currentPos+1] != ' ')
+                        line.insert(++currentPos, 1, ' ');
+                    break;
+                    //Corrupts the #include lines at the beginning of files
+//                case '<':
+//                case '>':
+//                    if(line[currentPos-1] != ' ' && line[currentPos-1] != '<' && line[currentPos-1] != '>')
+//                        line.insert(currentPos++, 1, ' ');
+//                    if(line[currentPos+1] != ' ' && line[currentPos+1] != '<' && line[currentPos+1] != '>')
+//                        line.insert(++currentPos, 1, ' ');
+//                    break;
                 default:
                     break;
             }
         }
         (*output) << line << endl;
     }
-    return false;
+    return true;
 }
 
 void checkIndentation(string& line, char& currentChar, short unsigned& currentPos, short unsigned& indentationLevel, const short unsigned& spaceAmount)
@@ -166,8 +211,6 @@ void checkIndentation(string& line, char& currentChar, short unsigned& currentPo
     if(spacesNeeded > 0)
         line.insert(currentPos, spacesNeeded, ' ');
     else if(spacesNeeded < 0)
-        line.erase(currentPos, spacesNeeded*-1);
+        line.erase(currentPos+spacesNeeded, spacesNeeded*-1);
     currentPos += spacesNeeded; //if spaces were inserted or deleted, move the currentPos pointer accordingly
-    if(line[currentPos] == '}')
-        ++currentPos; //ignore the '}' char after indentation
 }
