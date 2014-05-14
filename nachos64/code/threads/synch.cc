@@ -35,9 +35,9 @@
 
 Semaphore::Semaphore(const char* debugName, int initialValue)
 {
-    name = (char *)debugName;
-    value = initialValue;
-    queue = new List<Thread*>;
+	name = (char*)debugName;
+	value = initialValue;
+	queue = new List<Thread*>;
 }
 
 //----------------------------------------------------------------------
@@ -48,7 +48,7 @@ Semaphore::Semaphore(const char* debugName, int initialValue)
 
 Semaphore::~Semaphore()
 {
-    delete queue;
+	delete queue;
 }
 
 //----------------------------------------------------------------------
@@ -64,16 +64,17 @@ Semaphore::~Semaphore()
 void
 Semaphore::P()
 {
-    IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
-    
-    while (value == 0) { 			// semaphore not available
-	queue->Append(currentThread);		// so go to sleep
-	currentThread->Sleep();
-    } 
-    value--; 					// semaphore available, 
-						// consume its value
-    
-    interrupt->SetLevel(oldLevel);		// re-enable interrupts
+	IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
+	
+	while (value == 0) 			// semaphore not available
+	{
+		queue->Append(currentThread);		// so go to sleep
+		currentThread->Sleep();
+	} 
+	value--; 					// semaphore available, 
+								// consume its value
+	
+	interrupt->SetLevel(oldLevel);		// re-enable interrupts
 }
 
 //----------------------------------------------------------------------
@@ -87,14 +88,14 @@ Semaphore::P()
 void
 Semaphore::V()
 {
-    Thread *thread;
-    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+	Thread *thread;
+	IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
-    thread = queue->Remove();
-    if (thread != NULL)	   // make thread ready, consuming the V immediately
-	scheduler->ReadyToRun(thread);
-    value++;
-    interrupt->SetLevel(oldLevel);
+	thread = queue->Remove();
+	if(thread != NULL)	   // make thread ready, consuming the V immediately
+		scheduler->ReadyToRun(thread);
+	value++;
+	interrupt->SetLevel(oldLevel);
 }
 
 #ifdef USER_PROGRAM
@@ -107,13 +108,13 @@ Semaphore::V()
 void
 Semaphore::Destroy()
 {
-    Thread *thread;
-    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+	Thread* thread;
+	IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
-    while ( (thread = queue->Remove() ) != NULL )	// make thread ready
-	scheduler->ReadyToRun(thread);
+	while((thread = queue->Remove()) != NULL)	// make thread ready
+		scheduler->ReadyToRun(thread);
 
-    interrupt->SetLevel(oldLevel);
+	interrupt->SetLevel(oldLevel);
 }
 
 #endif
@@ -122,98 +123,93 @@ Semaphore::Destroy()
 // Dummy functions -- so we can compile our later assignments 
 // Note -- without a correct implementation of Condition::Wait(), 
 // the test case in the network assignment won't work!
-Lock::Lock(const char* debugName) {
+Lock::Lock(const char* debugName)
+{
 
-    char tmp[50];
+	char tmp[50];
 
-    name = (char *) debugName;
-    lockHolder = NULL;			// No process holds this lock
-    sprintf( tmp, "%s mutex", name );
-    mutex = new Semaphore( tmp, 1 );
-
-}
-
-
-Lock::~Lock() {
-
-    delete mutex;
+	name = (char*) debugName;
+	lockHolder = NULL;			// No process holds this lock
+	sprintf(tmp, "%s mutex", name);
+	mutex = new Semaphore(tmp, 1);
 
 }
 
 
-void Lock::Acquire() {
-
-    mutex->P();
-    lockHolder = currentThread;
-
+Lock::~Lock()
+{
+	delete mutex;
 }
 
 
-void Lock::Release() {
-
-    ASSERT( isHeldByCurrentThread() );
-    lockHolder = NULL;
-    mutex->V();
-
+void Lock::Acquire()
+{
+	mutex->P();
+	lockHolder = currentThread;
 }
 
 
-bool Lock::isHeldByCurrentThread() {
+void Lock::Release()
+{
+	ASSERT( isHeldByCurrentThread() );
+	lockHolder = NULL;
+	mutex->V();
+}
 
+
+bool Lock::isHeldByCurrentThread()
+{
    return (lockHolder == currentThread);
-
 }
 
 
-Condition::Condition(const char* debugName) {
-
-    name = (char *) debugName;
-    waitQueue = new List<Semaphore *>;
-
+Condition::Condition(const char* debugName)
+{
+	name = (char *) debugName;
+	waitQueue = new List<Semaphore *>;
 }
 
 
-Condition::~Condition() {
-
-    delete waitQueue;
-
+Condition::~Condition()
+{
+	delete waitQueue;
 }
 
 
-void Condition::Wait( Lock * conditionLock ) {
+void Condition::Wait( Lock * conditionLock )
+{
+	Semaphore* waiter;
 
-    Semaphore * waiter;
+	ASSERT( conditionLock->isHeldByCurrentThread() );
 
-    ASSERT( conditionLock->isHeldByCurrentThread() );
-
-    waiter = new Semaphore("condition", 0);
-    waitQueue->Append( waiter );
-    conditionLock->Release();		// Release lock before sleeping
-    waiter->P();
-    conditionLock->Acquire();		// Regains the lock
-    delete waiter;
+	waiter = new Semaphore("condition", 0);
+	waitQueue->Append(waiter);
+	conditionLock->Release();		// Release lock before sleeping
+	waiter->P();
+	conditionLock->Acquire();		// Regains the lock
+	delete waiter;
 }
 
 
-void Condition::Signal( Lock * conditionLock ) {
+void Condition::Signal( Lock * conditionLock )
+{
+	Semaphore* waiter;
 
-    Semaphore * waiter;
+	ASSERT( conditionLock->isHeldByCurrentThread() );
 
-    ASSERT( conditionLock->isHeldByCurrentThread() );
-
-    if ( ! waitQueue->IsEmpty() ) {
-        waiter = waitQueue->Remove();
-        waiter->V();
-    }
-
+	if(!waitQueue->IsEmpty())
+	{
+		waiter = waitQueue->Remove();
+		waiter->V();
+	}
 }
 
 
-void Condition::Broadcast( Lock * conditionLock ) {
-
-    while ( ! waitQueue->IsEmpty() ) {
-        Signal( conditionLock );
-    }
-
+void Condition::Broadcast( Lock* conditionLock )
+{
+	while(!waitQueue->IsEmpty())
+	{
+		Signal( conditionLock );
+	}
 }
 
