@@ -14,6 +14,9 @@
 #define SYSCALLS_H
 
 #include "copyright.h"
+//#include "system.h"
+//#include "machine.h"
+//#include "../threads/utility.h"
 
 /* system call codes -- used by the stubs to tell the kernel which system call
  * is being asked for
