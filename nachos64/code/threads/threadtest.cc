@@ -14,23 +14,94 @@
 #include "copyright.h"
 #include "system.h"
 #include "dinningph.h"
+//for lab 5:
+#include <time.h>
+#include <wait.h>
 
 DinningPh* dp;
-Semaphore* sem;	//for lab 5
+//for lab 5:
+Semaphore semH("H sem", 1); //initial value = 1
+Semaphore semO("O sem", 1); //because they work like mutex
+Semaphore semA("A sem", 1);
+unsigned int HatomCount = 0;
+unsigned int OatomCount = 0;
+unsigned int H2OmoleculeCount = 0;
 
-void water(void* name)	//for lab 5
+void H(void* name)
+{
+	printf("%s entrando =]", (char*) name);
+	semH.P();
+	semO.P();
+	semA.P();
+	if(HatomCount>0 && OatomCount>0) //it can make water
+	{
+		--HatomCount;
+		--OatomCount;
+		printf("\n***Agua! Hice agua! Yo el proceso '%s' hice agua! Yay =D\n", (char*) name);
+		++H2OmoleculeCount;
+	}
+	else //it can not make water, add itself to the list
+		++HatomCount;
+	//show stats, just to see and check the process
+	printf("\t(Hs: %d, Os: %d, As: %d)\n", HatomCount, OatomCount, H2OmoleculeCount);
+	semH.V();
+	semO.V();
+	semA.V();
+}
+
+void O(void* name)
+{
+	printf("%s entrando =)", (char*) name);
+	semH.P();
+	semO.P();
+	semA.P();
+	if(HatomCount>1) //it can make water
+	{
+		HatomCount -= 2;
+		printf("\n***Agua! Hice agua! Yo el proceso '%s' hice agua! Yay =D\n", (char*) name);
+		++H2OmoleculeCount;
+	}
+	else //it can not make water, add itself to the list
+		++OatomCount;
+	//show stats, just to see and check the process
+	printf("\t(Hs: %d, Os: %d, As: %d)\n", HatomCount, OatomCount, H2OmoleculeCount);
+	semH.V();
+	semO.V();
+	semA.V();
+}
+
+void water()	//for lab 5
 {
 	// Reinterpret arg "name" as a string
-	char* threadName = (char*)name;
+	//char* threadName = (char*)name;
 	
 	//Create 20 threads, which will randomly be either H atoms or O atoms
-	for(int num=0; num<10; num++)
+	srand(time(NULL));
+	for(int num=0; num<20; num++)
 	{
 		char* threadname = new char[100];
-		sprintf(threadname, "Hilo %d", k);
-		Thread* newThread = new Thread(threadname);
-		newThread->Fork(SimpleThread, (void*)threadname);
+		if(rand()%2)
+		{
+			sprintf(threadname, "Hilo %d de Hidrógeno", num);
+			Thread* hThread = new Thread(threadname);
+			hThread->Fork(H, (void*)threadname);
+		}
+		else
+		{
+			sprintf(threadname, "Hilo %d de Oxígeno", num);
+			Thread* oThread = new Thread(threadname);
+			oThread->Fork(O, (void*)threadname);
+		}
 	}
+
+	//Cool wait function that waits for the next child process to finish
+	//use in a cycle to wait for all of them
+	int k, n;
+	for(int i=0; i<20; ++i)
+	{
+		//printf("Esperando al proceso %d\n", i);
+        n = wait(&k);
+    }
 }
 
 void Philo(void* p)
@@ -116,6 +187,7 @@ void ThreadTest()
 
 	return;
 */
+/*
 	for(int k=1; k<=5; k++)
 	{
 		char* threadname = new char[100];
@@ -125,9 +197,9 @@ void ThreadTest()
 	}
 	
 	SimpleThread((void*)"Hilo 0");
-	
+*/
 	//Now, to test the water making
-	printf("Now testing the water making");
-	water((void*)"Main");
+	printf("\n---Now testing the water making---\n");
+	water();
 }
 
