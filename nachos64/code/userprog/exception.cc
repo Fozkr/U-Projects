@@ -27,6 +27,7 @@
 #include "syscall.h"
 //Unix stuff
 #include <fcntl.h>
+#include <unistd.h>
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -69,27 +70,44 @@ void Halt()	// System call 0
 
 }	// Nachos_Halt
 
-void Open()	// System call 5
+
+void readFromVirtualMemory(char* array, int virtualAdress)
 {
-/* System call definition described to user
-	int Open(
-		char *name	// Register 4
-	);
-*/
-	// Read the name from the user memory, see 4 below
+	int temp = -1;
+	int i = 0;
+	while(temp != 0)
+	{
+		machine->ReadMem(virtualAdress++, 1, &temp);
+		array[i] = (char) temp;
+		++i;
+	}
+}
+
+void Create()
+{
+	// Read the file name from the user virtual memory, see 4 below
 	int virtualAdressOfParameter = machine->ReadRegister(4);
 	//int physicalAdressOfParameter;
 	//machine->Translate(virtualAdressOfParameter, &physicalAdressOfParameter, 4, false);
 	char filename[100] = {0};
-	int temp = -1;
-	for(unsigned int i=0; i<100; ++i)
-	{
-		machine->ReadMem(virtualAdressOfParameter, 1, &temp);
-		filename[i] = (char) temp;
-		if(filename[i] == '\0')
-			break;
-	}
-	// = physicalAdressOfParameter;
+	readFromVirtualMemory(filename, virtualAdressOfParameter);
+	
+	int result = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
+	
+	// Verify for errors
+	//if(result < 0)
+	
+	machine->WriteRegister(2, result);
+}
+
+void Open()	// System call 5
+{
+	// Read the file name from the user virtual memory, see 4 below
+	int virtualAdressOfParameter = machine->ReadRegister(4);
+	//int physicalAdressOfParameter;
+	//machine->Translate(virtualAdressOfParameter, &physicalAdressOfParameter, 4, false);
+	char filename[100] = {0};
+	readFromVirtualMemory(filename, virtualAdressOfParameter);
 	
 	//TODO: create a global linked list that contains the names of all opened files
 	//Check if the file is already open
@@ -99,7 +117,7 @@ void Open()	// System call 5
 	int UnixFileID = open(filename, O_RDWR);
 	
 	// Use openFilesTable class to create a relationship between user file and unix file
-	currentThread->filesTable->Open(UnixFileID);
+	currentThread->openedFilesTable->Open(UnixFileID);
 	
 	// Verify for errors
 
@@ -107,45 +125,47 @@ void Open()	// System call 5
 
 void Write()	// System call 7
 {
-
-/* System call definition described to user
-        void Write(
-		char *buffer,	// Register 4
-		int size,	// Register 5
-		 OpenFileId id	// Register 6
-	);
-*/
-	char* buffer = NULL;
-	int size = machine->ReadRegister(5);	// Read size to write
-    OpenFileId id = machine->ReadRegister(6);	// Read file descriptor
-	
+	char* buffer;
+	int bufferSize = machine->ReadRegister(5);	// Read size to write
+    OpenFileId fileID = machine->ReadRegister(6);	// Read file descriptor
+	//printf("HELLOOO %d", fileID);
     // buffer = Read data from address given by user;
 	int virtualAdressOfBuffer = machine->ReadRegister(4);
-
-
-	// Need a semaphore to synchronize access to console
-	// Console->P();
-	switch(id)
+	// create buffer with the given size
+	buffer = new char[bufferSize];
+	// read from virtual memory
+	readFromVirtualMemory(buffer, virtualAdressOfBuffer);
+	switch(fileID)
 	{
 		case ConsoleInput:	// User could not write to standard input
 			machine->WriteRegister(2, -1);
 			break;
 		case ConsoleOutput:
-			buffer[size] = 0;
+			// Need a semaphore to synchronize access to console
+			// Console->P();
+			//machine->consoleMutexSem->P();
+			buffer[bufferSize] = 0;
 			printf("%s", buffer);
+			// Update simulation stats, see details in Statistics class in machine/stats.cc
+			// Console->V();
+			//machine->consoleMutexSem->V();
 			break;
 		case ConsoleError: // This trick permits to write integers to console
 			printf("%d\n", machine->ReadRegister(4));
 			break;
 		default: // All other opened files
-				// Verify if the file is opened, if not return -1 in r2
+			if(currentThread->openedFilesTable->isOpened(fileID)) // Verify if the file is opened, if not return -1 in r2
+			{
 				// Get the unix handle from our table for open files
 				// Do the write to the already opened Unix file
-				// Return the number of chars written to user, via r2
+				int result = write(currentThread->openedFilesTable->getUnixHandle(fileID), buffer, bufferSize);
+				// Verify for errors with result
+				machine->WriteRegister(2, result);
+			}
+			else
+				machine->WriteRegister(2, -1);
     }
-    // Update simulation stats, see details in Statistics class in machine/stats.cc
-    // Console->V();
-    
+    delete buffer;
     returnFromSystemCall(); // Update the PC registers
 
 } // Nachos_Write
@@ -153,31 +173,34 @@ void Write()	// System call 7
 void ExceptionHandler(ExceptionType which)
 {
 	int type = machine->ReadRegister(2);
-	
 	switch(which)
 	{
        case SyscallException:
-	  switch(type)
-	  {
+		switch(type)
+		{
 	     case SC_Halt:
-			Halt();	     // System call # 0
+			Halt();	    // System call # 0
+			break;
+		 case SC_Create:
+			Create();	// System call # 1
 			break;
 	     case SC_Open:
-			Open();	     // System call # 5
+			Open();	    // System call # 2
 			break;
 	     case SC_Write:
-			Write();	    // System call # 7
+			Write();	// System call # 3
 			break;
 	     default:
 			printf("Unexpected syscall exception %d\n", type);
 			//ASSERT(FALSE);
 			break;
-	  }
+		}
+		returnFromSystemCall();
 		break;
-       default:
-	  printf("Unexpected exception %d\n", which);
-	  //ASSERT(FALSE);
-	  break;
+      default:
+		printf("Unexpected exception %d\n", which);
+		//ASSERT(FALSE);
+		break;
     }
 /*
 	if((which == SyscallException)&&(type == SC_Halt))

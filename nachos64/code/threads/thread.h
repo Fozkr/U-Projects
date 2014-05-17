@@ -43,6 +43,7 @@
 #ifdef USER_PROGRAM
 #include "machine.h"
 #include "addrspace.h"
+#include "openFilesTable.h"
 #endif
 
 // CPU register state to be saved on context switch.  
@@ -123,7 +124,8 @@ class Thread {
     void SaveUserState();		// save user-level register state
     void RestoreUserState();		// restore user-level register state
 
-    AddrSpace *space;			// User code this thread is running.
+    AddrSpace* space;			// User code this thread is running.
+    openFilesTable* openedFilesTable;	// new class that contains a table with the files opened by each thread
 #endif
 };
 

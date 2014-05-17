@@ -40,6 +40,7 @@ Thread::Thread(const char* threadName)
     status = JUST_CREATED;
 #ifdef USER_PROGRAM
     space = NULL;
+    openedFilesTable = new openFilesTable;
 #endif
 }
 
@@ -61,7 +62,10 @@ Thread::~Thread()
 
     ASSERT(this != currentThread);
     if (stack != NULL)
-	DeallocBoundedArray((char *) stack, StackSize * sizeof(HostMemoryAddress));
+	DeallocBoundedArray((char*) stack, StackSize * sizeof(HostMemoryAddress));
+#ifdef USER_PROGRAM
+    delete openedFilesTable;
+#endif
 }
 
 //----------------------------------------------------------------------
