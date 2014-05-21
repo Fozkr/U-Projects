@@ -98,6 +98,13 @@ void Halt()
 
 }	//Halt
 
+// System call #1
+// Exit
+void Exit()
+{
+	currentThread->Finish();
+}
+
 // System call #4
 // Creates a file in the current directory (where the executable is).
 void Create()
@@ -288,6 +295,9 @@ void ExceptionHandler(ExceptionType whichException)
 			{
 				case SC_Halt:
 					Halt();		// System call # 0
+					break;
+				case SC_Exit:
+					Exit();		// System call # 1
 					break;
 				case SC_Create:
 					Create();	// System call # 4

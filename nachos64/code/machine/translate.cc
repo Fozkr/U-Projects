@@ -84,8 +84,7 @@ ShortToMachine(unsigned short shortword) { return ShortToHost(shortword); }
 //	"value" -- the place to write the result
 //----------------------------------------------------------------------
 
-bool
-Machine::ReadMem(int addr, int size, int *value)
+bool Machine::ReadMem(int addr, int size, int *value)
 {
     int data;
     ExceptionType exception;
@@ -94,27 +93,27 @@ Machine::ReadMem(int addr, int size, int *value)
     DEBUG('a', "Reading VA 0x%x, size %d\n", addr, size);
     
     exception = Translate(addr, &physicalAddress, size, false);
-    if (exception != NoException) {
-	machine->RaiseException(exception, addr);
-	return false;
-    }
-    switch (size) {
-      case 1:
-	data = machine->mainMemory[physicalAddress];
-	*value = data;
-	break;
-	
-      case 2:
-	data = *(unsigned short *) &machine->mainMemory[physicalAddress];
-	*value = ShortToHost(data);
-	break;
-	
-      case 4:
-	data = *(unsigned int *) &machine->mainMemory[physicalAddress];
-	*value = WordToHost(data);
-	break;
-
-      default: ASSERT(false);
+    if(exception != NoException)
+    {
+		machine->RaiseException(exception, addr);
+		return false;
+	}
+    switch(size)
+    {
+		case 1:
+			data = machine->mainMemory[physicalAddress];
+			*value = data;
+			break;
+		case 2:
+			data = *(unsigned short *) &machine->mainMemory[physicalAddress];
+			*value = ShortToHost(data);
+			break;
+		case 4:
+			data = *(unsigned int *) &machine->mainMemory[physicalAddress];
+			*value = WordToHost(data);
+			break;
+		default:
+			ASSERT(false);
     }
     
     DEBUG('a', "\tvalue read = %8.8x\n", *value);
@@ -134,8 +133,7 @@ Machine::ReadMem(int addr, int size, int *value)
 //	"value" -- the data to be written
 //----------------------------------------------------------------------
 
-bool
-Machine::WriteMem(int addr, int size, int value)
+bool Machine::WriteMem(int addr, int size, int value)
 {
     ExceptionType exception;
     int physicalAddress;
@@ -143,26 +141,23 @@ Machine::WriteMem(int addr, int size, int value)
     DEBUG('a', "Writing VA 0x%x, size %d, value 0x%x\n", addr, size, value);
 
     exception = Translate(addr, &physicalAddress, size, true);
-    if (exception != NoException) {
-	machine->RaiseException(exception, addr);
-	return false;
+    if(exception != NoException)
+    {
+		machine->RaiseException(exception, addr);
+		return false;
     }
-    switch (size) {
-      case 1:
-	machine->mainMemory[physicalAddress] = (unsigned char) (value & 0xff);
-	break;
-
-      case 2:
-	*(unsigned short *) &machine->mainMemory[physicalAddress]
-		= ShortToMachine((unsigned short) (value & 0xffff));
-	break;
-      
-      case 4:
-	*(unsigned int *) &machine->mainMemory[physicalAddress]
-		= WordToMachine((unsigned int) value);
-	break;
-	
-      default: ASSERT(false);
+    switch(size)
+    {
+		case 1:
+			machine->mainMemory[physicalAddress] = (unsigned char) (value & 0xff);
+			break;
+		case 2:
+			*(unsigned short *) &machine->mainMemory[physicalAddress] = ShortToMachine((unsigned short) (value & 0xffff));
+			break;
+		case 4:
+			*(unsigned int *) &machine->mainMemory[physicalAddress] = WordToMachine((unsigned int) value);
+			break;
+		default: ASSERT(false);
     }
     
     return true;
@@ -183,8 +178,7 @@ Machine::WriteMem(int addr, int size, int value)
 // 	"writing" -- if true, check the "read-only" bit in the TLB
 //----------------------------------------------------------------------
 
-ExceptionType
-Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
+ExceptionType Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
 {
     int i;
     unsigned int vpn, offset;

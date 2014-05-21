@@ -12,12 +12,12 @@
 // This defines *all* of the global data structures used by Nachos.
 // These are all initialized and de-allocated by this file.
 
-Thread *currentThread;			// the thread we are running now
-Thread *threadToBeDestroyed;  		// the thread that just finished
-Scheduler *scheduler;			// the ready list
-Interrupt *interrupt;			// interrupt status
-Statistics *stats;			// performance metrics
-Timer *timer;				// the hardware timer device,
+Thread* currentThread;			// the thread we are running now
+Thread* threadToBeDestroyed;  		// the thread that just finished
+Scheduler* scheduler;			// the ready list
+Interrupt* interrupt;			// interrupt status
+Statistics* stats;			// performance metrics
+Timer* timer;				// the hardware timer device,
 					// for invoking context switches
 					
 // 2007, Jose Miguel Santos Espino
@@ -25,19 +25,20 @@ PreemptiveScheduler* preemptiveScheduler = NULL;
 const long long DEFAULT_TIME_SLICE = 50000;
 
 #ifdef FILESYS_NEEDED
-FileSystem  *fileSystem;
+FileSystem* fileSystem;
 #endif
 
 #ifdef FILESYS
-SynchDisk   *synchDisk;
+SynchDisk* synchDisk;
 #endif
 
 #ifdef USER_PROGRAM	// requires either FILESYS or FILESYS_STUB
-Machine *machine;	// user program memory and registers
+Machine* machine;	// user program memory and registers
+BitMap* mainMemoryMap; // the map represents the PAGES, not the bytes
 #endif
 
 #ifdef NETWORK
-PostOffice *postOffice;
+PostOffice* postOffice;
 #endif
 
 
@@ -178,6 +179,7 @@ Initialize(int argc, char **argv)
     
 #ifdef USER_PROGRAM
     machine = new Machine(debugUserProg);	// this must come first
+	mainMemoryMap = new BitMap(NumPhysPages); // the map represents the PAGES, not the bytes
 #endif
 
 #ifdef FILESYS
