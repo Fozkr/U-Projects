@@ -21,7 +21,6 @@
 // All rights reserved.  See copyright.h for copyright notice and limitation 
 // of liability and disclaimer of warranty provisions.
 
-//#include "../threads/system.h"
 #include "copyright.h"
 #include "system.h"
 #include "syscall.h"
@@ -52,157 +51,272 @@
 //	are in machine.h.
 //----------------------------------------------------------------------
 
-void returnFromSystemCall()	// returnFromSystemCall
+// Modify the registers in order for the user program to continue running
+// normally after the system call execution.
+void returnFromSystemCall()
 {
 	int pc, npc;
 
 	pc = machine->ReadRegister(PCReg);
 	npc = machine->ReadRegister(NextPCReg);
-	machine->WriteRegister(PrevPCReg, pc);	// PrevPC <- PC
-	machine->WriteRegister(PCReg, npc);	   // PC <- NextPC
-	machine->WriteRegister(NextPCReg, npc + 4);   // NextPC <- NextPC + 4
+	machine->WriteRegister(PrevPCReg, pc);		// PrevPC <- PC
+	machine->WriteRegister(PCReg, npc);			// PC <- NextPC
+	machine->WriteRegister(NextPCReg, npc + 4);	// NextPC <- NextPC+4
+}	//returnFromSystemCall
+
+// Read of write data (mainly chars) BYTE BY BYTE from/to the virtual
+// user memory.
+void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
+{
+	int i = 0;
+	if(read)
+	{
+		int temp = -1;
+		while(temp != 0)
+		{
+			machine->ReadMem(virtualAdress++, 1, &temp);
+			array[i] = (char) temp;
+			++i;
+		}
+	}
+	else
+	{
+		while(array[i] != '\0')
+		{
+			machine->WriteMem(virtualAdress++, 1, array[i]);
+			++i;
+		}
+	}
 }
 
-void Halt()	// System call 0
+// System call #0
+// Halts the entire operating system and exits
+void Halt()
 {
 	DEBUG('a', "Shutdown, initiated by user program.\n");
 	interrupt->Halt();
 
-}	// Nachos_Halt
+}	//Halt
 
-
-void readFromVirtualMemory(char* array, int virtualAdress)
-{
-	int temp = -1;
-	int i = 0;
-	while(temp != 0)
-	{
-		machine->ReadMem(virtualAdress++, 1, &temp);
-		array[i] = (char) temp;
-		++i;
-	}
-}
-
+// System call #4
+// Creates a file in the current directory (where the executable is).
 void Create()
 {
-	// Read the file name from the user virtual memory, see 4 below
+	// Read the file name from the user virtual memory
 	int virtualAdressOfParameter = machine->ReadRegister(4);
-	//int physicalAdressOfParameter;
-	//machine->Translate(virtualAdressOfParameter, &physicalAdressOfParameter, 4, false);
-	char filename[100] = {0};
-	readFromVirtualMemory(filename, virtualAdressOfParameter);
+	char filename[128] = {'\0'};
+	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
 	
-	int result = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
+	// Unix creat
+	int UnixFileID = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
 	
 	// Verify for errors
-	//if(result < 0)
+	//if(UnixFileID < 0)
 	
-	machine->WriteRegister(2, result);
+	// Return the UnixFileID
+	machine->WriteRegister(2, UnixFileID);
 }
 
-void Open()	// System call 5
+// System call #5
+// Opens an already created file (if it does not exist, it should create
+// it) in order to be able to "read from"/"write to" it.
+void Open()
 {
-	// Read the file name from the user virtual memory, see 4 below
+	// Read the file name from the user virtual memory
 	int virtualAdressOfParameter = machine->ReadRegister(4);
-	//int physicalAdressOfParameter;
-	//machine->Translate(virtualAdressOfParameter, &physicalAdressOfParameter, 4, false);
-	char filename[100] = {0};
-	readFromVirtualMemory(filename, virtualAdressOfParameter);
+	char filename[128] = {'\0'};
+	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
 	
 	//TODO: create a global linked list that contains the names of all opened files
-	//Check if the file is already open
+	// Check if the file is already open
 	
-	//Open the file using the Linux system call
-	//filesystem->Open(filename);
+	// Open the file using the Linux system call
+	//filesystem->Open(filename); //find out if this is necessary
 	int UnixFileID = open(filename, O_RDWR);
 	
-	// Use openFilesTable class to create a relationship between user file and unix file
-	currentThread->openedFilesTable->Open(UnixFileID);
+	// Use openFilesTable class to link nachos fileID with Unix fileID
+	int NachosFileID = currentThread->openedFilesTable->Open(UnixFileID);
 	
 	// Verify for errors
 
-}       // Nachos_Open
+	// Return the NachosFileID
+	machine->WriteRegister(2, NachosFileID);
+}
 
-void Write()	// System call 7
+// System call #6
+// Reads from either the console (stdin) or a file, given that the file
+// is previously opened.
+void Read()
 {
 	char* buffer;
+	// Obtain parameters
+	int virtualAdressOfBuffer = machine->ReadRegister(4); //COPY WHAT IS READ INTO THIS BUFFER IN THE END
 	int bufferSize = machine->ReadRegister(5);	// Read size to write
-    OpenFileId fileID = machine->ReadRegister(6);	// Read file descriptor
-	//printf("HELLOOO %d", fileID);
-    // buffer = Read data from address given by user;
-	int virtualAdressOfBuffer = machine->ReadRegister(4);
-	// create buffer with the given size
-	buffer = new char[bufferSize];
-	// read from virtual memory
-	readFromVirtualMemory(buffer, virtualAdressOfBuffer);
-	switch(fileID)
+    OpenFileId NachosFileID = machine->ReadRegister(6);	// Read fileID
+	// Create buffer with the given size
+	buffer = new char[bufferSize+1]; //+1 to add a '\0' at the end
+	
+	// Determine where to read from
+	switch(NachosFileID)
 	{
-		case ConsoleInput:	// User could not write to standard input
-			machine->WriteRegister(2, -1);
-			break;
-		case ConsoleOutput:
-			// Need a semaphore to synchronize access to console
+		case ConsoleInput:	//User can read from standard input, always open
+			// Need a semaphore to control access to console
 			// Console->P();
-			//machine->consoleMutexSem->P();
-			buffer[bufferSize] = 0;
-			printf("%s", buffer);
+			// machine->consoleMutexSem->P(); //attempt to do that
+			for(int i=0; i<bufferSize; ++i) //to control the amount of chars read
+				scanf("%c", buffer+i); //apparently ok to use scanf
+			buffer[bufferSize] = '\0'; //just in case
 			// Update simulation stats, see details in Statistics class in machine/stats.cc
 			// Console->V();
-			//machine->consoleMutexSem->V();
+			// machine->consoleMutexSem->V(); //attempt to do that
 			break;
-		case ConsoleError: // This trick permits to write integers to console
-			printf("%d\n", machine->ReadRegister(4));
+		case ConsoleOutput: //User can not read from stdout
+			machine->WriteRegister(2, -1);
+			break;
+		case ConsoleError: //...not sure what to do here, find out later***
+			//This trick permits to write ints to console
+			//printf("%d\n", machine->ReadRegister(4));
 			break;
 		default: // All other opened files
-			if(currentThread->openedFilesTable->isOpened(fileID)) // Verify if the file is opened, if not return -1 in r2
+			// Verify if file is open, if not, return -1 in register2
+			if(currentThread->openedFilesTable->isOpen(NachosFileID))
 			{
-				// Get the unix handle from our table for open files
-				// Do the write to the already opened Unix file
-				int result = write(currentThread->openedFilesTable->getUnixHandle(fileID), buffer, bufferSize);
+				// Get the UnixFileID from our table for open files
+				int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
+				// Do the Unix read to the already opened Unix file
+				int result = read(UnixFileID, buffer, bufferSize);
 				// Verify for errors with result
+				// Return the result
 				machine->WriteRegister(2, result);
 			}
 			else
 				machine->WriteRegister(2, -1);
+			break;
     }
-    delete buffer;
-    returnFromSystemCall(); // Update the PC registers
-
-} // Nachos_Write
     
-void ExceptionHandler(ExceptionType which)
+    // Now that it has read into the new buffer, copy to original buffer
+	readOrWriteVirtualMemory(false, buffer, virtualAdressOfBuffer);
+    
+    // Delete the dynamic buffer
+    delete buffer;
+}
+
+// System call #7
+// Writes on either the console (stdout) or a file, given that the file
+// is previously opened.
+void Write()
+{
+	char* buffer;
+	// Obtain parameters
+	int bufferSize = machine->ReadRegister(5);	// Read size to write
+    OpenFileId NachosFileID = machine->ReadRegister(6);	// Read fileID
+	int virtualAdressOfBuffer = machine->ReadRegister(4);
+	// Create buffer with the given size
+	buffer = new char[bufferSize+1]; //+1 to add a '\0' at the end
+	// Read from virtual memory into that buffer
+	readOrWriteVirtualMemory(true, buffer, virtualAdressOfBuffer);
+	
+	// Determine where to write
+	switch(NachosFileID)
+	{
+		case ConsoleInput:	//User can not write to standard input
+			machine->WriteRegister(2, -1);
+			break;
+		case ConsoleOutput: //User can write to stdout, always open
+			// Need a semaphore to control access to console
+			// Console->P();
+			// machine->consoleMutexSem->P(); //attempt to do that
+			buffer[bufferSize] = '\0'; //apparently necessary
+			printf("%s", buffer); //apparently ok to use printf
+			// Update simulation stats, see details in Statistics class in machine/stats.cc
+			// Console->V();
+			// machine->consoleMutexSem->V(); //attempt to do that
+			break;
+		case ConsoleError: //This trick permits to write ints to console
+			printf("%d\n", machine->ReadRegister(4));
+			break;
+		default: // All other opened files
+			// Verify if file is open, if not, return -1 in register2
+			if(currentThread->openedFilesTable->isOpen(NachosFileID))
+			{
+				// Get the UnixFileID from our table for open files
+				int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
+				// Do the Unix write to the already opened Unix file
+				int result = write(UnixFileID, buffer, bufferSize);
+				// Verify for errors with result
+				// Return the result
+				machine->WriteRegister(2, result);
+			}
+			else
+				machine->WriteRegister(2, -1);
+			break;
+    }
+    
+    // Delete the dynamic buffer
+    delete buffer;
+}
+
+// Closes an open file
+void Close()
+{
+	// Read the nachos file ID of the file from register4
+	int NachosFileID = machine->ReadRegister(4);
+	
+	// Check in the global linked list if this file is indeed open
+	// If is not close, do nothing; if it is open, close it
+	// Get the UnixFileID from our table for open files
+	int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
+	// Use the Unix close system call
+	int result = close(UnixFileID);
+	
+	// Verify for errors with result
+	
+	// Return the result
+	machine->WriteRegister(2, result);
+}
+
+// The exception handler, it is invoked whenever a system call is used
+// and it handles what to do when any of them is used; it invokes each
+// one of the previous functions as required.
+void ExceptionHandler(ExceptionType whichException)
 {
 	int type = machine->ReadRegister(2);
-	switch(which)
+	switch(whichException)
 	{
-       case SyscallException:
-		switch(type)
-		{
-	     case SC_Halt:
-			Halt();	    // System call # 0
+		case SyscallException:
+			switch(type)
+			{
+				case SC_Halt:
+					Halt();		// System call # 0
+					break;
+				case SC_Create:
+					Create();	// System call # 4
+					break;
+				case SC_Open:
+					Open();		// System call # 5
+					break;
+				case SC_Read:
+					Read();		// System call # 6
+					break;
+				case SC_Write:
+					Write();	// System call # 7
+					break;
+				case SC_Close:
+					Close();	// System call # 8
+					break;
+				default:
+					printf("Unexpected syscall exception %d\n", type);
+					//ASSERT(FALSE);
+					break;
+			}
+			returnFromSystemCall(); //Update the pc registers
 			break;
-		 case SC_Create:
-			Create();	// System call # 1
-			break;
-	     case SC_Open:
-			Open();	    // System call # 2
-			break;
-	     case SC_Write:
-			Write();	// System call # 3
-			break;
-	     default:
-			printf("Unexpected syscall exception %d\n", type);
+		default:
+			printf("Unexpected exception %d\n", whichException);
 			//ASSERT(FALSE);
 			break;
-		}
-		returnFromSystemCall();
-		break;
-      default:
-		printf("Unexpected exception %d\n", which);
-		//ASSERT(FALSE);
-		break;
     }
-/*
+/* Old code
 	if((which == SyscallException)&&(type == SC_Halt))
 	{
 		DEBUG('a', "Shutdown, initiated by user program.\n");

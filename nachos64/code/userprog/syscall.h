@@ -34,7 +34,7 @@
 #define SC_SemCreate	11
 #define SC_SemDestroy	12
 #define SC_SemSignal	13
-#define SC_SemWait	14
+#define SC_SemWait		14
 
 #ifndef IN_ASM
 
