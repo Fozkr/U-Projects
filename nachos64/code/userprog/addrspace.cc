@@ -89,8 +89,8 @@ AddrSpace::AddrSpace(OpenFile *executable)
     for(i=0; i<numPages; i++) // reserves pages for uninitData and stack too
     {
 		int nextFreePhysicalPage = mainMemoryMap->Find();
-		pageTable[i].virtualPage = i;	// for now, virtual page # = phys page #
-		pageTable[i].physicalPage = nextFreePhysicalPage; // MODIFY THIS i *****
+		pageTable[i].virtualPage = i;
+		pageTable[i].physicalPage = nextFreePhysicalPage;
 		pageTable[i].valid = true;
 		pageTable[i].use = false;
 		pageTable[i].dirty = false;
@@ -101,8 +101,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
     
 	// zero out the entire address space, to zero the unitialized data
 	// segment and the stack segment
-    bzero(machine->mainMemory, size);
-    // MODIFY THIS so it only zeros-out the necessary memory segment *****
+    bzero(machine->mainMemory, size); // MODIFY THIS so it only zeros-out the necessary memory segment *****
 
 	// then, copy the code and data segments into memory
     if(noffH.code.size > 0)
