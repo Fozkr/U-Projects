@@ -5,7 +5,7 @@ openFilesTable::openFilesTable()
 	: usage(1)
 {
 	openFiles = new long[SIZE_OF_TABLE];
-	openFilesMap = new BitMap(SIZE_OF_TABLE*sizeof(long));
+	openFilesMap = new BitMap(SIZE_OF_TABLE); // (*sizeof(long))
 	openFilesMap->Mark(0); //stdin
 	openFilesMap->Mark(1); //stdout
 	openFilesMap->Mark(2); //stderr
@@ -80,4 +80,17 @@ void openFilesTable::initializeBoolTable()
 {
 	for(unsigned int i=0; i<SIZE_OF_TABLE; ++i)
 		openedByCurrentThread[i] = false;
+}
+
+// Copy the table from the father process, the whole class (usage, vector, bitmap and bool vector)
+void openFilesTable::copyTable(openFilesTable* otherTable)
+{
+	usage = otherTable->usage;
+	for(int i=0; i<SIZE_OF_TABLE; ++i)
+	{
+		openFiles[i] = otherTable->openFiles[i];
+		if(otherTable->openFilesMap->Test(i))
+			openFilesMap->Mark(i);
+		openedByCurrentThread[i] = false;
+	}
 }

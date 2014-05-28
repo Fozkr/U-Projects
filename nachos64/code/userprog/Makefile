@@ -444,8 +444,9 @@ exception.o: ../userprog/exception.cc ../userprog/copyright.h \
  ../userprog/openFilesTable.h ../userprog/bitmap.h ../filesys/openfile.h \
  ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
  ../threads/list.h ../machine/stats.h ../machine/timer.h \
- ../userprog/syscall.h /usr/include/fcntl.h /usr/include/bits/fcntl.h \
- /usr/include/bits/uio.h /usr/include/bits/stat.h /usr/include/unistd.h \
+ ../userprog/syscall.h ../threads/synch.h /usr/include/fcntl.h \
+ /usr/include/bits/fcntl.h /usr/include/bits/uio.h \
+ /usr/include/bits/stat.h /usr/include/unistd.h \
  /usr/include/bits/posix_opt.h /usr/include/bits/environments.h \
  /usr/include/bits/confname.h /usr/include/getopt.h
 progtest.o: ../userprog/progtest.cc ../userprog/copyright.h \

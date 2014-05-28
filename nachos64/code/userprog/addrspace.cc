@@ -51,8 +51,7 @@ SwapHeader (NoffHeader *noffH)
 //	Assumes that the object code file is in NOFF format.
 //
 //	First, set up the translation from program memory to physical 
-//	memory.  For now, this is really simple (1:1), since we are
-//	only uniprogramming, and we have a single unsegmented page table
+//	memory.
 //
 //	"executable" is the file containing the object code to load into memory
 //----------------------------------------------------------------------
@@ -101,7 +100,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
     
 	// zero out the entire address space, to zero the unitialized data
 	// segment and the stack segment
-    bzero(machine->mainMemory, size); // MODIFY THIS so it only zeros-out the necessary memory segment *****
+    //bzero(machine->mainMemory, size); // MODIFY THIS so it only zeros-out the necessary memory segment *****
 
 	// then, copy the code and data segments into memory
     if(noffH.code.size > 0)
@@ -120,11 +119,50 @@ AddrSpace::AddrSpace(OpenFile *executable)
         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", noffH.initData.virtualAddr, noffH.initData.size);
         //executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),noffH.initData.size, noffH.initData.inFileAddr);
         unsigned int numPagesOfInitData = divRoundUp(noffH.initData.size, PageSize);
-		for(i=0; i<numPagesOfInitData; i++)
+		for(; i<numPagesOfInitData; i++)
 		{
 			int physicalPage = pageTable[i].physicalPage;
 			executable->ReadAt(&(machine->mainMemory[physicalPage * PageSize]), PageSize, noffH.initData.inFileAddr + (i * PageSize));
 		}
+    }
+}
+
+//----------------------------------------------------------------------
+// AddrSpace::AddrSpace
+// 	Create an address space to run a user function.
+//	Load the adress space from another adress space, as a copy from the
+//	father process's adress space.
+//----------------------------------------------------------------------
+
+AddrSpace::AddrSpace(AddrSpace* otherSpace)
+{
+	//return;
+	numPages = otherSpace->numPages;
+	DEBUG('a', "Copying address space, num pages %d\n", numPages);
+	unsigned int i;
+    pageTable = new TranslationEntry[numPages];
+    for(i=0; i<(numPages - UserStackSize/PageSize); i++) // reserves pages for uninitData and stack too
+    {
+		pageTable[i].virtualPage = otherSpace->pageTable[i].virtualPage;
+		pageTable[i].physicalPage = otherSpace->pageTable[i].physicalPage;
+		pageTable[i].valid = true;
+		pageTable[i].use = false;
+		pageTable[i].dirty = false;
+		pageTable[i].readOnly = false;  // if the code segment was entirely on 
+										// a separate page, we could set its 
+										// pages to be read-only
+    }
+    
+    for(; i<(UserStackSize/PageSize); i++) // reserves pages for uninitData and stack too
+    {
+	DEBUG('a', "%d\n", i);
+		int nextFreePhysicalPage = mainMemoryMap->Find();
+		pageTable[i].virtualPage = i;
+		pageTable[i].physicalPage = nextFreePhysicalPage;
+		pageTable[i].valid = true;
+		pageTable[i].use = false;
+		pageTable[i].dirty = false;
+		pageTable[i].readOnly = false;
     }
 }
 
@@ -135,17 +173,19 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
 AddrSpace::~AddrSpace()
 {
-	for(unsigned int page=0; page<numPages; ++page)
-		mainMemoryMap->Clear(pageTable[page].physicalPage);
-   /*
-    * int posicionPorDesmarcar;
-    * for(int i = 0; i < numPages; i++)
-    * {
-    * 	 posicionPorDesmarcar = pageTable[i];
-    * 	 if(mainMemoryMap->Test(i)) mainMemoryMap->Clear(i);
-    * }
-    */	
-   delete pageTable;
+	// If there are no child threads associated to this thread, delete
+	// the whole adress space. Otherwise, delete only the stack.
+	if(currentThread->openedFilesTable->getUsage() > 1) //there are child threads, delete the stack only
+	{
+		for(unsigned int page=(numPages - UserStackSize/PageSize); page<numPages; ++page)
+			mainMemoryMap->Clear(pageTable[page].physicalPage);
+	}
+	else
+	{
+		for(unsigned int page=0; page<numPages; ++page)
+			mainMemoryMap->Clear(pageTable[page].physicalPage);
+	}
+	delete pageTable;
 }
 
 //----------------------------------------------------------------------
