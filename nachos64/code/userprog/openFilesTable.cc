@@ -4,8 +4,8 @@
 openFilesTable::openFilesTable()
 	: usage(1)
 {
-	openFiles = new int[SIZE_OF_TABLE];
-	openFilesMap = new BitMap(SIZE_OF_TABLE*sizeof(int));
+	openFiles = new long[SIZE_OF_TABLE];
+	openFilesMap = new BitMap(SIZE_OF_TABLE*sizeof(long));
 	openFilesMap->Mark(0); //stdin
 	openFilesMap->Mark(1); //stdout
 	openFilesMap->Mark(2); //stderr
@@ -27,7 +27,7 @@ openFilesTable::~openFilesTable()
 }
 
 // Register the file ID in the table
-int openFilesTable::Open(int UnixFileID)
+int openFilesTable::Open(long UnixFileID)
 {
 	int nextFreePos = openFilesMap->Find();
 	openFiles[nextFreePos] = UnixFileID;
@@ -49,7 +49,7 @@ bool openFilesTable::isOpen(int NachosFileID)
 }
 
 // Returns the Unix file ID of the file using the Nachos file ID
-int openFilesTable::getUnixFileID(int NachosFileID)
+long openFilesTable::getUnixFileID(int NachosFileID)
 {
 	return openFiles[NachosFileID];
 }
@@ -71,7 +71,7 @@ void openFilesTable::Print()
 {
 	for(unsigned int pos=0; pos<SIZE_OF_TABLE; ++pos)
 	{
-		printf("%d\t%d\t%d", pos, openFilesMap->Test(pos), openFiles[pos]);
+		printf("%d\t%d\t%li", pos, openFilesMap->Test(pos), openFiles[pos]);
 	}
 }
 

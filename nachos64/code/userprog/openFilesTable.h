@@ -14,9 +14,9 @@ class openFilesTable
     openFilesTable();       				// Initialize 
     ~openFilesTable();      				// De-allocate
     
-    int Open(int UnixFileID); 				// Register the file ID
+    int Open(long UnixFileID); 				// Register the file ID
     int Close(int NachosFileID);    		// Unregister the file ID
-    int getUnixFileID(int NachosFileID);	// Get the file ID
+    long getUnixFileID(int NachosFileID);	// Get the file ID
     bool isOpen(int NachosFileID);			// Check by ID if it is open
     void addThread();						// If a user thread is using this table, add it
     void delThread();						// If a user thread is using this table, delete it
@@ -24,7 +24,7 @@ class openFilesTable
     void initializeBoolTable();				// Initialize the bool table
     
   private:
-    int* openFiles;							// A vector with user opened Unix file IDs
+    long* openFiles;						// A vector with user opened Unix file IDs. Uses long in order to work with semaphore pointers
     int usage;								// How many threads are using this table
     BitMap* openFilesMap;					// A bitmap to control our vector
     bool* openedByCurrentThread;			// Bool table that indicates wether each file has been opened by the current thread or not

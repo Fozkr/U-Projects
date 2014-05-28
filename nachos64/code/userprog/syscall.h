@@ -14,27 +14,28 @@
 #define SYSCALLS_H
 
 #include "copyright.h"
+#include "synch.h"
 //#include "machine.h"
 //#include "../threads/utility.h"
 
 /* system call codes -- used by the stubs to tell the kernel which system call
  * is being asked for
  */
-#define SC_Halt		0
+#define SC_Halt		0				// Check
 #define SC_Exit		1
 #define SC_Exec		2
 #define SC_Join		3
-#define SC_Create	4
-#define SC_Open		5
-#define SC_Read		6
-#define SC_Write	7
-#define SC_Close	8
+#define SC_Create	4				// Check
+#define SC_Open		5				// Check
+#define SC_Read		6				// Check
+#define SC_Write	7				// Check
+#define SC_Close	8				// Check
 #define SC_Fork		9
-#define SC_Yield	10
-#define SC_SemCreate	11
-#define SC_SemDestroy	12
-#define SC_SemSignal	13
-#define SC_SemWait		14
+#define SC_Yield	10				// Check
+#define SC_SemCreate	11		    // Check DECIRLE AL PROFE QUE REVISE
+#define SC_SemDestroy	12			// Check DECIRLE AL PROFE QUE REVISE
+#define SC_SemSignal	13			// Check DECIRLE AL PROFE QUE REVISE
+#define SC_SemWait		14          // Check DECIRLE AL PROFE QUE REVISE
 
 #ifndef IN_ASM
 

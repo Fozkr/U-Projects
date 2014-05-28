@@ -189,7 +189,7 @@ void Read()
 			if(currentThread->openedFilesTable->isOpen(NachosFileID))
 			{
 				// Get the UnixFileID from our table for open files
-				int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
+				int UnixFileID = (int)(currentThread->openedFilesTable->getUnixFileID(NachosFileID));
 				// Do the Unix read to the already opened Unix file
 				int result = read(UnixFileID, buffer, bufferSize);
 				// Verify for errors with result
@@ -282,6 +282,54 @@ void Close()
 	machine->WriteRegister(2, result);
 }
 
+void Yield()
+{
+	currentThread->Yield();
+}
+
+void SemCreate()
+{
+	// Get initial value for semaphore
+	int initialValueOfSemaphore = machine->ReadRegister(4);
+	Semaphore* sem = new Semaphore("Sempahore created in system call",initialValueOfSemaphore);
+	// Get the next free position in the openFilesTable which is equivalent to this semaphoreID
+	// The semaphores are interpreted as files too
+	int semID = currentThread->openedFilesTable->Open((long)sem);
+	
+	// Return semID
+	machine->WriteRegister(2, semID);
+}
+
+void SemDestroy()
+{
+	// Get identification of sempahore
+	int semID = machine->ReadRegister(4);
+	// Obtain the semaphoreID from openFilesTable  
+	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
+	currentThread->openedFilesTable->Close(semID);
+	// Invokes destroy so the threads in the semaphore queue don't stay asleep 
+	sem->Destroy();
+	delete sem;
+}
+
+void SemSignal()
+{
+	// Get identification of sempahore
+	int semID = machine->ReadRegister(4);
+	// Obtain the semaphoreID from openFilesTable  
+	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
+	sem->V();
+}
+
+void SemWait()
+{
+	// Get identification of sempahore
+	int semID = machine->ReadRegister(4);
+	// Obtain the semaphoreID from openFilesTable  
+	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
+	sem->P();
+}
+
 // The exception handler, it is invoked whenever a system call is used
 // and it handles what to do when any of them is used; it invokes each
 // one of the previous functions as required.
@@ -314,6 +362,21 @@ void ExceptionHandler(ExceptionType whichException)
 				case SC_Close:
 					Close();	// System call # 8
 					break;
+				case SC_Yield:
+					Yield();	// System call # 10
+					break;
+			/*	case SC_SemCreate:	// System call # 11
+				    SemCreate();
+				    break;
+				case SC_SemDestroy:	// System call # 12
+					SemDestroy();
+					break;
+				case SC_SemSignal:	// System call # 13
+					SemSignal();
+					break;
+				case SC_SemWait:	// System call # 14
+					SemWait();
+					break;	*/
 				default:
 					printf("Unexpected syscall exception %d\n", type);
 					//ASSERT(FALSE);
