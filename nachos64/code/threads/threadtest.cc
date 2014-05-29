@@ -96,11 +96,11 @@ void water()	//for lab 5
 
 	//Cool wait function that waits for the next child process to finish
 	//use in a cycle to wait for all of them
-	int k, n;
+	int k;
 	for(int i=0; i<20; ++i)
 	{
 		//printf("Esperando al proceso %d\n", i);
-        n = wait(&k);
+        wait(&k);
     }
 }
 

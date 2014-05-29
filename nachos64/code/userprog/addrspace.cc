@@ -58,7 +58,7 @@ SwapHeader (NoffHeader *noffH)
 
 AddrSpace::AddrSpace(OpenFile *executable)
 {
-	//Added in lab 7
+	//For lab 7 testing
 	//for(int itr=0; itr<=10; itr+=2)
 	//	mainMemoryMap->Mark(itr);
 	
@@ -136,13 +136,13 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
 AddrSpace::AddrSpace(AddrSpace* otherSpace)
 {
-	//return;
 	numPages = otherSpace->numPages;
-	DEBUG('a', "Copying address space, num pages %d\n", numPages);
+	DEBUG('a', "Copying address space, num pages: %d\n", numPages);
 	unsigned int i;
     pageTable = new TranslationEntry[numPages];
     for(i=0; i<(numPages - UserStackSize/PageSize); i++) // reserves pages for uninitData and stack too
     {
+		DEBUG('a', "Copying code, inidata and uninitdata, page: %d\n", i);
 		pageTable[i].virtualPage = otherSpace->pageTable[i].virtualPage;
 		pageTable[i].physicalPage = otherSpace->pageTable[i].physicalPage;
 		pageTable[i].valid = true;
@@ -152,10 +152,10 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 										// a separate page, we could set its 
 										// pages to be read-only
     }
-    
-    for(; i<(UserStackSize/PageSize); i++) // reserves pages for uninitData and stack too
+    // Use the same "i" from before, but run the for structure 8 times (the stack uses 8 pages)
+    for(unsigned int k=0; k<(UserStackSize/PageSize); k++) // reserves pages for uninitData and stack too
     {
-	DEBUG('a', "%d\n", i);
+		DEBUG('a', "Reserving stack, page: %d\n", i);
 		int nextFreePhysicalPage = mainMemoryMap->Find();
 		pageTable[i].virtualPage = i;
 		pageTable[i].physicalPage = nextFreePhysicalPage;
@@ -163,6 +163,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 		pageTable[i].use = false;
 		pageTable[i].dirty = false;
 		pageTable[i].readOnly = false;
+		++i;
     }
 }
 
@@ -198,8 +199,7 @@ AddrSpace::~AddrSpace()
 //	when this thread is context switched out.
 //----------------------------------------------------------------------
 
-void
-AddrSpace::InitRegisters()
+void AddrSpace::InitRegisters()
 {
     int i;
 

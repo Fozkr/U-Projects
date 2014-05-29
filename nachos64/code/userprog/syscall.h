@@ -30,7 +30,7 @@
 #define SC_Read		6				// Check
 #define SC_Write	7				// Check
 #define SC_Close	8				// Check
-#define SC_Fork		9
+#define SC_Fork		9				// Check
 #define SC_Yield	10				// Check
 #define SC_SemCreate	11		    // Check DECIRLE AL PROFE QUE REVISE
 #define SC_SemDestroy	12			// Check DECIRLE AL PROFE QUE REVISE

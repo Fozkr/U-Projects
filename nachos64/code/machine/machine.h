@@ -32,24 +32,22 @@ const int PageSize = SectorSize; 	// set the page size equal to
 					// the disk sector size, for
 					// simplicity
 
-const int NumPhysPages = 32;
+const unsigned int NumPhysPages = 32;
 const int MemorySize = NumPhysPages * PageSize;
 const int TLBSize = 4;			// if there is a TLB, make it small
 
-enum ExceptionType { NoException,           // Everything ok!
-		     SyscallException,      // A program executed a system call.
-		     PageFaultException,    // No valid translation found
-		     ReadOnlyException,     // Write attempted to page marked 
-					    // "read-only"
-		     BusErrorException,     // Translation resulted in an 
-					    // invalid physical address
-		     AddressErrorException, // Unaligned reference or one that
-					    // was beyond the end of the
-					    // address space
-		     OverflowException,     // Integer overflow in add or sub.
-		     IllegalInstrException, // Unimplemented or reserved instr.
-		     
-		     NumExceptionTypes
+enum ExceptionType
+{
+	NoException,			// 0-Everything ok!
+	SyscallException,		// 1-A program executed a system call.
+	PageFaultException,		// 2-No valid translation found
+	ReadOnlyException,		// 3-Write attempted to page marked "read-only"
+	BusErrorException,		// 4-Translation resulted in an invalid physical address
+	AddressErrorException,	// 5-Unaligned reference or one that was beyond the end of the address space
+	OverflowException,		// 6-Integer overflow in add or sub.
+	IllegalInstrException,	// 7-Unimplemented or reserved instr.
+
+	NumExceptionTypes
 };
 
 // User program CPU state.  The full set of MIPS registers, plus a few

@@ -55,6 +55,7 @@
 // normally after the system call execution.
 void returnFromSystemCall()
 {
+	DEBUG('m', "Modifying registers to simulate return from system call\n");
 	int pc, npc;
 
 	pc = machine->ReadRegister(PCReg);
@@ -62,7 +63,7 @@ void returnFromSystemCall()
 	machine->WriteRegister(PrevPCReg, pc);		// PrevPC <- PC
 	machine->WriteRegister(PCReg, npc);			// PC <- NextPC
 	machine->WriteRegister(NextPCReg, npc + 4);	// NextPC <- NextPC+4
-}	//returnFromSystemCall
+}
 
 // Read of write data (mainly chars) BYTE BY BYTE from/to the virtual
 // user memory.
@@ -71,6 +72,7 @@ void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
 	int i = 0;
 	if(read)
 	{
+		DEBUG('m', "Reading from virtual memory, starting at virtual adress: %d\n", virtualAdress);
 		int temp = -1;
 		while(temp != 0)
 		{
@@ -81,6 +83,7 @@ void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
 	}
 	else
 	{
+		DEBUG('m', "Writing to virtual memory, starting at virtual adress: %d\n", virtualAdress);
 		while(array[i] != '\0')
 		{
 			machine->WriteMem(virtualAdress++, 1, array[i]);
@@ -93,7 +96,7 @@ void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
 // Halts the entire operating system and exits
 void Nachos_Halt()
 {
-	DEBUG('a', "Shutdown, initiated by user program.\n");
+	DEBUG('m', "Shutdown, initiated by user program.\n");
 	interrupt->Halt();
 
 }	//Halt
@@ -102,6 +105,7 @@ void Nachos_Halt()
 // Exit
 void Nachos_Exit()
 {
+	DEBUG('m', "Exiting through system call\n");
 	currentThread->Finish();
 }
 
@@ -113,6 +117,7 @@ void Nachos_Create()
 	int virtualAdressOfParameter = machine->ReadRegister(4);
 	char filename[128] = {'\0'};
 	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
+	DEBUG('m', "Creating a file with filename: %s\n", filename);
 	
 	// Unix creat
 	int UnixFileID = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -133,6 +138,7 @@ void Nachos_Open()
 	int virtualAdressOfParameter = machine->ReadRegister(4);
 	char filename[128] = {'\0'};
 	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
+	DEBUG('m', "Opening a file with filename: %s\n", filename);
 	
 	//TODO: create a global linked list that contains the names of all opened files
 	// Check if the file is already open
@@ -162,6 +168,7 @@ void Nachos_Read()
     OpenFileId NachosFileID = machine->ReadRegister(6);	// Read fileID
 	// Create buffer with the given size
 	buffer = new char[bufferSize+1]; //+1 to add a '\0' at the end
+	DEBUG('m', "Reading from a file with fileID: %d\n", NachosFileID);
 	
 	// Determine where to read from
 	switch(NachosFileID)
@@ -220,6 +227,7 @@ void Nachos_Write()
 	int virtualAdressOfBuffer = machine->ReadRegister(4);
 	// Create buffer with the given size
 	buffer = new char[bufferSize+1]; //+1 to add a '\0' at the end
+	DEBUG('m', "Writing to a file with fileID: %d\n", NachosFileID);
 	// Read from virtual memory into that buffer
 	readOrWriteVirtualMemory(true, buffer, virtualAdressOfBuffer);
 	
@@ -269,6 +277,7 @@ void Nachos_Close()
 {
 	// Read the nachos file ID of the file from register4
 	int NachosFileID = machine->ReadRegister(4);
+	DEBUG('m', "Closing a file with fileID: %d\n", NachosFileID);
 	
 	// Check in the global linked list if this file is indeed open
 	// If is not close, do nothing; if it is open, close it
@@ -286,7 +295,7 @@ void Nachos_Close()
 // Secondary function for Nachos_Fork
 void NachosForkThread(void* v)
 {
-	//return;
+	DEBUG('m', "Starting NachosForkThread, the auxiliar function of Nachos_Fork\n");
     AddrSpace *space;
 
     space = currentThread->space;
@@ -306,9 +315,9 @@ void NachosForkThread(void* v)
 // System call #9
 void Nachos_Fork()
 {
-	DEBUG( 'u', "Entering Fork System call\n" );
+	DEBUG('u', "Entering Fork System call\n");
 	// We need to create a new kernel thread to execute the user thread
-	Thread* newThread = new Thread( "Child to execute Fork code" );
+	Thread* newThread = new Thread( "Child-to-execute-Fork-code" );
 	currentThread->openedFilesTable->addThread();
 	// We need to share the Open File Table structure with this new child
 	newThread->openedFilesTable->copyTable(currentThread->openedFilesTable);
@@ -325,18 +334,20 @@ void Nachos_Fork()
 	// Pass the user routine address, now in register 4, as a parameter
 	newThread->Fork(NachosForkThread, (void*) machine->ReadRegister(4));
 
-	DEBUG( 'u', "Exiting Fork System call\n" );
+	DEBUG('u', "Exiting Fork System call\n");
 }
 
 // System call #10
 void Nachos_Yield()
 {
+	DEBUG('m', "Yielding\n");
 	currentThread->Yield();
 }
 
 // System call #11
 void Nachos_SemCreate()
 {
+	DEBUG('m', "Creating a semaphore\n");
 	// Get initial value for semaphore
 	int initialValueOfSemaphore = machine->ReadRegister(4);
 	Semaphore* sem = new Semaphore("Sempahore created in system call",initialValueOfSemaphore);
@@ -347,6 +358,7 @@ void Nachos_SemCreate()
 	
 	// Return semID
 	machine->WriteRegister(2, semID);
+	DEBUG('m', "Created a semaphore with id: %d\n", semID);
 }
 
 // System call #12
@@ -354,9 +366,12 @@ void Nachos_SemDestroy()
 {
 	// Get identification of sempahore
 	int semID = machine->ReadRegister(4);
+	DEBUG('m', "Destroying semaphore with id: %d\n", semID);
+	
 	// Obtain the semaphoreID from openFilesTable  
 	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
 	currentThread->openedFilesTable->Close(semID);
+	
 	// Invokes destroy so the threads in the semaphore queue don't stay asleep 
 	sem->Destroy();
 	delete sem;
@@ -367,6 +382,8 @@ void Nachos_SemSignal()
 {
 	// Get identification of sempahore
 	int semID = machine->ReadRegister(4);
+	DEBUG('m', "Signaling semaphore with id: %d\n", semID);
+	
 	// Obtain the semaphoreID from openFilesTable  
 	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
 	sem->V();
@@ -377,6 +394,8 @@ void Nachos_SemWait()
 {
 	// Get identification of sempahore
 	int semID = machine->ReadRegister(4);
+	DEBUG('m', "Waiting semaphore with id: %d\n", semID);
+	
 	// Obtain the semaphoreID from openFilesTable  
 	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
 	sem->P();
@@ -387,11 +406,12 @@ void Nachos_SemWait()
 // one of the previous functions as required.
 void ExceptionHandler(ExceptionType whichException)
 {
-    DEBUG('a', "Entering ExceptionHandler\n");
+    //DEBUG('m', "Entering ExceptionHandler with exception: %d\n", whichException);
 	int type = machine->ReadRegister(2);
 	switch(whichException)
 	{
 		case SyscallException:
+			DEBUG('m', "Syscall: %d\n", type);
 			switch(type)
 			{
 				case SC_Halt:
