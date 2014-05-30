@@ -458,6 +458,7 @@ void Nachos_Fork()
 	newThread->openedFilesTable->copyTable(currentThread->openedFilesTable);
 	newThread->associatedSemaphores->copyTable(currentThread->associatedSemaphores);
 	newThread->openedFilesTable->initializeBoolTable();
+	newThread->associatedSemaphores->initializeBoolTable();
 	
 	// Add this thread to the father tables
 	currentThread->openedFilesTable->addThread();

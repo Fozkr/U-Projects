@@ -32,7 +32,7 @@ const int PageSize = SectorSize; 	// set the page size equal to
 					// the disk sector size, for
 					// simplicity
 
-const unsigned int NumPhysPages = 32;
+const unsigned int NumPhysPages = 64;	// Modified on friday 30th
 const int MemorySize = NumPhysPages * PageSize;
 const int TLBSize = 4;			// if there is a TLB, make it small
 

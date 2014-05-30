@@ -88,6 +88,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
     for(i=0; i<numPages; i++) // reserves pages for uninitData and stack too
     {
 		int nextFreePhysicalPage = mainMemoryMap->Find();
+		DEBUG('a', "nextFreePhysicalPage: %d\n", nextFreePhysicalPage);
 		pageTable[i].virtualPage = i;
 		pageTable[i].physicalPage = nextFreePhysicalPage;
 		pageTable[i].valid = true;
