@@ -55,7 +55,7 @@
 // normally after the system call execution.
 void returnFromSystemCall()
 {
-	DEBUG('m', "Modifying registers to simulate return from system call\n");
+	DEBUG('u', "Modifying registers to simulate return from system call\n");
 	int pc, npc;
 
 	pc = machine->ReadRegister(PCReg);
@@ -67,12 +67,12 @@ void returnFromSystemCall()
 
 // Read of write data (mainly chars) BYTE BY BYTE from/to the virtual
 // user memory.
-void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
+void readOrWriteVirtualMemory(bool read, char* array, long virtualAdress)
 {
 	int i = 0;
 	if(read)
 	{
-		DEBUG('m', "Reading from virtual memory, starting at virtual adress: %d\n", virtualAdress);
+		DEBUG('u', "Reading from virtual memory, starting at virtual adress: %d\n", virtualAdress);
 		int temp = -1;
 		while(temp != 0)
 		{
@@ -83,7 +83,7 @@ void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
 	}
 	else
 	{
-		DEBUG('m', "Writing to virtual memory, starting at virtual adress: %d\n", virtualAdress);
+		DEBUG('u', "Writing to virtual memory, starting at virtual adress: %d\n", virtualAdress);
 		while(array[i] != '\0')
 		{
 			machine->WriteMem(virtualAdress++, 1, array[i]);
@@ -96,7 +96,7 @@ void readOrWriteVirtualMemory(bool read, char* array, int virtualAdress)
 // Halts the entire operating system and exits
 void Nachos_Halt()
 {
-	DEBUG('m', "Shutdown, initiated by user program.\n");
+	DEBUG('u', "Shutdown, initiated by user program.\n");
 	interrupt->Halt();
 
 }	//Halt
@@ -105,16 +105,16 @@ void Nachos_Halt()
 // Exit
 void Nachos_Exit()
 {
-	DEBUG('m', "Exiting through system call\n");
+	DEBUG('u', "Exiting through system call, pid: %d\n", currentThread->pid);
 	// First wait for the child processes to finish
-	DEBUG('m', "Waiting for child processes\n");
+	DEBUG('u', "Waiting for child processes\n");
 	while(currentThread->openedFilesTable->getUsage()>1 && currentThread->associatedSemaphores->getUsage()>1) //while there are active child processes
 		currentThread->Yield(); //just wait
 	
 	// Free the adress space, done in the adress space destructor, invoked by the thread destructor AT THE END
 	
 	// Close the open files (opened by the current thread)
-	DEBUG('m', "Closing files\n");
+	DEBUG('u', "Closing files\n");
 	for(unsigned int file=3; file<SIZE_OF_TABLE; ++file) // Start with 3, becuase 0, 1, 2 are reserved
 	{
 		if(currentThread->openedFilesTable->isOpen(file) && currentThread->openedFilesTable->openedByCurrentThread[file])
@@ -129,7 +129,7 @@ void Nachos_Exit()
 	}
 	
 	// Delete the associated semaphores (created by the current thread)
-	DEBUG('m', "Deleting semaphores\n");
+	DEBUG('u', "Deleting semaphores\n");
 	for(unsigned int file=3; file<SIZE_OF_TABLE; ++file) // Start with 3, becuase 0, 1, 2 are reserved
 	{
 		if(currentThread->associatedSemaphores->isOpen(file) && currentThread->associatedSemaphores->openedByCurrentThread[file])
@@ -143,47 +143,49 @@ void Nachos_Exit()
 		}
 	}
 	
-	// Substract 1 from the father process tables' usage
+	// If this is a child process
 	if(currentThread->fatherProcess != NULL)
 	{
-		DEBUG('m', "Substracting 1 from father's usage\n");
+		// Substract 1 from the father process tables' usage
+		DEBUG('u', "Substracting 1 from father's usage\n");
 		currentThread->fatherProcess->openedFilesTable->delThread();
 		currentThread->fatherProcess->associatedSemaphores->delThread();
-	}
 	
-	// Signal the father if he used JOIN
-	DEBUG('m', "Check if the thread is being waited in a Join\n");
-	if(threadsTable->getUnixFileID(currentThread->pid) > 0 && threadsTable->getUnixFileID(currentThread->pid) < 128)
-	{ //it means that it contains a Semaphore adress (pointer) and that indeed JOIN was used
-		DEBUG('m', "Signal the father (pid = %d) %d\n", currentThread->pid, threadsTable->getUnixFileID(currentThread->pid));
-		Semaphore* sem = (Semaphore*) threadsTable->getUnixFileID(currentThread->pid);
-		sem->V();
+		// Signal the father if he used JOIN
+		DEBUG('u', "Check if the thread is being waited for in a Join, content in table: %d\n", threadsTable->getUnixFileID(currentThread->pid));
+		if(threadsTable->getUnixFileID(currentThread->pid) > 0)
+		{ //it means that it contains a Semaphore adress (pointer) and that indeed JOIN was used
+			DEBUG('u', "Signal the father (pid = %d) %d\n", currentThread->pid, threadsTable->getUnixFileID(currentThread->pid));
+			Semaphore* sem = (Semaphore*) threadsTable->getUnixFileID(currentThread->pid);
+			sem->V();
+		}
 	}
 	
 	// Remove myself from the global threads table
-	DEBUG('m', "Removing from global threads table\n");
+	DEBUG('u', "Removing from global threads table\n");
 	if(currentThread->pid >= 0 && currentThread->pid <= SIZE_OF_TABLE) //if I am a child process
 		threadsTable->Close(currentThread->pid);
 	
 	// Finally, finish the current thread
-	DEBUG('m', "Exiting exit\n");
+	DEBUG('u', "Exiting exit\n");
 	currentThread->Finish();
 }
 
 // Secondary function of Nachos_Exec
-void nachosExecThread(void* filename)
+void nachosExecThread(void* virtualAdressOfParameter)
 {
-	
+	char filename[128] = {'\0'};
+	readOrWriteVirtualMemory(true, filename, (long) virtualAdressOfParameter);
     OpenFile* executable = fileSystem->Open((const char*)filename);
     AddrSpace* space;
 
     if(executable == NULL)
     {
-		printf("Unable to open file %s\n", (char*) filename);
+		printf("Unable to open file %s at Exec_aux\n", (char*) filename);
 		return;
     }
     
-    space = new AddrSpace(executable);    
+    space = new AddrSpace(executable);
     currentThread->space = space;
 
     delete executable;			// close file
@@ -201,13 +203,14 @@ void nachosExecThread(void* filename)
 void Nachos_Exec()
 {
 	// Read the file name from the user virtual memory
-	int virtualAdressOfParameter = machine->ReadRegister(4);
-	char filename[128] = {'\0'};
-	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
+	long virtualAdressOfParameter = (long) machine->ReadRegister(4);
+	//char filename[128] = {'\0'};
+	//readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
 	
 	// Create new thread and make it invoke kernel_fork
 	Thread* newThread = new Thread("Child", true, currentThread);
-	newThread->Fork(nachosExecThread, (void*) filename);
+	//newThread->Fork(nachosExecThread, (void*) filename);
+	newThread->Fork(nachosExecThread, (void*) virtualAdressOfParameter);
 	
 	// Return the pid of the child process
 	machine->WriteRegister(2, newThread->pid);
@@ -248,7 +251,7 @@ void Nachos_Create()
 	int virtualAdressOfParameter = machine->ReadRegister(4);
 	char filename[128] = {'\0'};
 	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
-	DEBUG('m', "Creating a file with filename: %s\n", filename);
+	DEBUG('u', "Creating a file with filename: %s\n", filename);
 	
 	// Unix creat
 	int UnixFileID = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
@@ -269,7 +272,7 @@ void Nachos_Open()
 	int virtualAdressOfParameter = machine->ReadRegister(4);
 	char filename[128] = {'\0'};
 	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
-	DEBUG('m', "Opening a file with filename: %s\n", filename);
+	DEBUG('u', "Opening a file with filename: %s\n", filename);
 	
 	//TODO: create a global linked list that contains the names of all opened files
 	// Check if the file is already open
@@ -299,7 +302,7 @@ void Nachos_Read()
     OpenFileId NachosFileID = machine->ReadRegister(6);	// Read fileID
 	// Create buffer with the given size
 	buffer = new char[bufferSize+1]; //+1 to add a '\0' at the end
-	DEBUG('m', "Reading from a file with fileID: %d\n", NachosFileID);
+	DEBUG('u', "Reading from a file with fileID: %d\n", NachosFileID);
 	
 	// Determine where to read from
 	switch(NachosFileID)
@@ -358,7 +361,7 @@ void Nachos_Write()
 	int virtualAdressOfBuffer = machine->ReadRegister(4);
 	// Create buffer with the given size
 	buffer = new char[bufferSize+1]; //+1 to add a '\0' at the end
-	DEBUG('m', "Writing to a file with fileID: %d\n", NachosFileID);
+	DEBUG('u', "Writing to a file with fileID: %d\n", NachosFileID);
 	// Read from virtual memory into that buffer
 	readOrWriteVirtualMemory(true, buffer, virtualAdressOfBuffer);
 	
@@ -408,7 +411,7 @@ void Nachos_Close()
 {
 	// Read the nachos file ID of the file from register4
 	int NachosFileID = machine->ReadRegister(4);
-	DEBUG('m', "Closing a file with fileID: %d\n", NachosFileID);
+	DEBUG('u', "Closing a file with fileID: %d\n", NachosFileID);
 	
 	// Check in the global linked list if this file is indeed open
 	// If is not close, do nothing; if it is open, close it
@@ -425,9 +428,9 @@ void Nachos_Close()
 }
 
 // Secondary function for Nachos_Fork
-void NachosForkThread(void* v)
+void NachosForkThread(void* pointerToFunction)
 {
-	DEBUG('m', "Starting NachosForkThread, the auxiliar function of Nachos_Fork\n");
+	DEBUG('u', "Starting NachosForkThread, the auxiliar function of Nachos_Fork\n");
     AddrSpace *space;
 
     space = currentThread->space;
@@ -436,10 +439,10 @@ void NachosForkThread(void* v)
 
 	// Set the return address for this thread to the same as the main thread
 	// This will lead this thread to call the exit system call and finish
-	unsigned long p = (unsigned long) v;
+	unsigned long pointer = (unsigned long) pointerToFunction;
     machine->WriteRegister(RetAddrReg, 4);
-    machine->WriteRegister(PCReg, p);
-    machine->WriteRegister(NextPCReg, p+4);
+    machine->WriteRegister(PCReg, pointer);
+    machine->WriteRegister(NextPCReg, pointer+4);
     machine->Run();                     // jump to the user progam
     ASSERT(false);
 }
@@ -478,14 +481,14 @@ void Nachos_Fork()
 // System call #10
 void Nachos_Yield()
 {
-	DEBUG('m', "Yielding\n");
+	DEBUG('u', "Yielding\n");
 	currentThread->Yield();
 }
 
 // System call #11
 void Nachos_SemCreate()
 {
-	DEBUG('m', "Creating a semaphore\n");
+	DEBUG('u', "Creating a semaphore\n");
 	// Get initial value for semaphore
 	int initialValueOfSemaphore = machine->ReadRegister(4);
 	Semaphore* sem = new Semaphore("Sempahore created in system call",initialValueOfSemaphore);
@@ -496,7 +499,7 @@ void Nachos_SemCreate()
 	
 	// Return semID
 	machine->WriteRegister(2, semID);
-	DEBUG('m', "Created a semaphore with id: %d\n", semID);
+	DEBUG('u', "Created a semaphore with id: %d\n", semID);
 }
 
 // System call #12
@@ -504,7 +507,7 @@ void Nachos_SemDestroy()
 {
 	// Get identification of sempahore
 	int semID = machine->ReadRegister(4);
-	DEBUG('m', "Destroying semaphore with id: %d\n", semID);
+	DEBUG('u', "Destroying semaphore with id: %d\n", semID);
 	
 	// Obtain the semaphoreID from openFilesTable  
 	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
@@ -520,7 +523,7 @@ void Nachos_SemSignal()
 {
 	// Get identification of sempahore
 	int semID = machine->ReadRegister(4);
-	DEBUG('m', "Signaling semaphore with id: %d\n", semID);
+	DEBUG('u', "Signaling semaphore with id: %d\n", semID);
 	
 	// Obtain the semaphoreID from openFilesTable  
 	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
@@ -532,7 +535,7 @@ void Nachos_SemWait()
 {
 	// Get identification of sempahore
 	int semID = machine->ReadRegister(4);
-	DEBUG('m', "Waiting semaphore with id: %d\n", semID);
+	DEBUG('u', "Waiting semaphore with id: %d\n", semID);
 	
 	// Obtain the semaphoreID from openFilesTable  
 	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
@@ -544,12 +547,12 @@ void Nachos_SemWait()
 // one of the previous functions as required.
 void ExceptionHandler(ExceptionType whichException)
 {
-    //DEBUG('m', "Entering ExceptionHandler with exception: %d\n", whichException);
+    //DEBUG('u', "Entering ExceptionHandler with exception: %d\n", whichException);
 	int type = machine->ReadRegister(2);
 	switch(whichException)
 	{
 		case SyscallException:
-			DEBUG('m', "Syscall: %d\n", type);
+			DEBUG('u', "Syscall: %d\n", type);
 			switch(type)
 			{
 				case SC_Halt:
