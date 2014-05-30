@@ -15,8 +15,8 @@
 
 #include "copyright.h"
 #include "synch.h"
-//#include "machine.h"
-//#include "../threads/utility.h"
+
+#define SIZE_OF_TABLE 128	// ALSO defined in openFilesTable.h, modify at the same time
 
 /* system call codes -- used by the stubs to tell the kernel which system call
  * is being asked for
@@ -66,10 +66,10 @@ typedef int SpaceId;
  */
 SpaceId Exec(char *name);
  
-/* Only return once the the user program "id" has finished.  
+/* Only return once the user program "id" has finished. 
  * Return the exit status.
  */
-int Join(SpaceId id); 	
+int Join(SpaceId id);
  
 
 /* File system operations: Create, Open, Read, Write, Close

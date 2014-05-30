@@ -33,6 +33,7 @@ extern Timer* timer;				// the hardware alarm clock
 #include "machine.h"
 extern Machine* machine;		// user program memory and registers
 extern BitMap* mainMemoryMap;	// bit map of nachos main memory PAGES used for multiprogramming support
+extern openFilesTable* threadsTable;	// global table of threads where the positions correspond to the pids 
 #endif
 
 #ifdef FILESYS_NEEDED 		// FILESYS or FILESYS_STUB 

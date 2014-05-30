@@ -35,6 +35,7 @@ SynchDisk* synchDisk;
 #ifdef USER_PROGRAM	// requires either FILESYS or FILESYS_STUB
 Machine* machine;	// user program memory and registers
 BitMap* mainMemoryMap; // the map represents the PAGES, not the bytes
+openFilesTable* threadsTable; // global table of threads where the positions correspond to the pids 
 #endif
 
 #ifdef NETWORK
@@ -180,6 +181,11 @@ Initialize(int argc, char **argv)
 #ifdef USER_PROGRAM
     machine = new Machine(debugUserProg);	// this must come first
 	mainMemoryMap = new BitMap(NumPhysPages); // the map represents the PAGES, not the bytes
+	threadsTable = new openFilesTable(true);
+	mainMemoryMap->Mark(0); //stdin
+	mainMemoryMap->Mark(1); //stdout
+	mainMemoryMap->Mark(2); //stderr
+	DEBUG('m', "Se creó la tabla de hilos\n");
 #endif
 
 #ifdef FILESYS
@@ -214,6 +220,7 @@ Cleanup()
     
 #ifdef USER_PROGRAM
     delete machine;
+    delete mainMemoryMap;
 #endif
 
 #ifdef FILESYS_NEEDED

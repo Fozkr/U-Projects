@@ -80,6 +80,7 @@ class Thread {
 
   public:
     Thread(const char* debugName);	// initialize a Thread 
+    Thread(const char* threadName, bool isAChild, Thread* father);  // initialize a thread with a pid
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
@@ -126,6 +127,9 @@ class Thread {
 
     AddrSpace* space;			// User code this thread is running.
     openFilesTable* openedFilesTable;	// new class that contains a table with the files opened by each thread
+    openFilesTable* associatedSemaphores;	// Table that contains semaphore pointers
+    Thread* fatherProcess;	// A pointer to the father thread, used only in child processes, after Nachos_Fork
+    int pid;
 #endif
 };
 

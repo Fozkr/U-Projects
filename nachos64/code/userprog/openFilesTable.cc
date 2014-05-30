@@ -5,11 +5,24 @@ openFilesTable::openFilesTable()
 	: usage(1)
 {
 	openFiles = new long[SIZE_OF_TABLE];
-	openFilesMap = new BitMap(SIZE_OF_TABLE); // (*sizeof(long))
+	openFilesMap = new BitMap(SIZE_OF_TABLE);
 	openFilesMap->Mark(0); //stdin
 	openFilesMap->Mark(1); //stdout
 	openFilesMap->Mark(2); //stderr
 	openedByCurrentThread = new bool[SIZE_OF_TABLE];
+}
+
+// Initialize with -1 everywhere
+openFilesTable::openFilesTable(bool isThreadsTable)
+	: usage(1)
+{
+	openFiles = new long[SIZE_OF_TABLE];
+	openFilesMap = new BitMap(SIZE_OF_TABLE);
+	openedByCurrentThread = new bool[SIZE_OF_TABLE];
+	
+	// Put -1 everywhere
+	for(unsigned int i=0; i<SIZE_OF_TABLE; ++i)
+		openFiles[i] = -1;
 }
 
 // De-allocate, ALSO close all the files that are currently open and associated to this thread
@@ -31,7 +44,7 @@ int openFilesTable::Open(long UnixFileID)
 {
 	int nextFreePos = openFilesMap->Find();
 	openFiles[nextFreePos] = UnixFileID;
-	//machine->WriteRegister(2, nextFreePos); //receive the Unix fileID and return the Nachos fileID
+	openedByCurrentThread[nextFreePos] = true;
 	return nextFreePos;
 }
 
@@ -52,6 +65,12 @@ bool openFilesTable::isOpen(int NachosFileID)
 long openFilesTable::getUnixFileID(int NachosFileID)
 {
 	return openFiles[NachosFileID];
+}
+
+// Register the semaphore ID in the table
+void openFilesTable::storeSemAdress(int NachosSemID, long adress)
+{
+	openFiles[NachosSemID] = adress;
 }
 
 // Simply add 1 to the counter of threads
@@ -85,7 +104,7 @@ void openFilesTable::initializeBoolTable()
 // Copy the table from the father process, the whole class (usage, vector, bitmap and bool vector)
 void openFilesTable::copyTable(openFilesTable* otherTable)
 {
-	usage = otherTable->usage;
+	//usage = otherTable->usage; //PORQUE NO NECESITAMOS COPIAR LA VARA PARA EL EXIIITTTT!!!	lml
 	for(int i=0; i<SIZE_OF_TABLE; ++i)
 	{
 		openFiles[i] = otherTable->openFiles[i];

@@ -106,7 +106,138 @@ void Nachos_Halt()
 void Nachos_Exit()
 {
 	DEBUG('m', "Exiting through system call\n");
+	// First wait for the child processes to finish
+	DEBUG('m', "Waiting for child processes\n");
+	while(currentThread->openedFilesTable->getUsage()>1 && currentThread->associatedSemaphores->getUsage()>1) //while there are active child processes
+		currentThread->Yield(); //just wait
+	
+	// Free the adress space, done in the adress space destructor, invoked by the thread destructor AT THE END
+	
+	// Close the open files (opened by the current thread)
+	DEBUG('m', "Closing files\n");
+	for(unsigned int file=3; file<SIZE_OF_TABLE; ++file) // Start with 3, becuase 0, 1, 2 are reserved
+	{
+		if(currentThread->openedFilesTable->isOpen(file) && currentThread->openedFilesTable->openedByCurrentThread[file])
+		{
+			// Simulate Nachos_Close call
+			// Get the UnixFileID from our table of open files
+			int UnixFileID = currentThread->openedFilesTable->getUnixFileID(file);
+			currentThread->openedFilesTable->Close(file);
+			// Use the Unix close system call
+			close(UnixFileID);
+		}
+	}
+	
+	// Delete the associated semaphores (created by the current thread)
+	DEBUG('m', "Deleting semaphores\n");
+	for(unsigned int file=3; file<SIZE_OF_TABLE; ++file) // Start with 3, becuase 0, 1, 2 are reserved
+	{
+		if(currentThread->associatedSemaphores->isOpen(file) && currentThread->associatedSemaphores->openedByCurrentThread[file])
+		{
+			// Simulate Nachos_Close call
+			// Get the UnixFileID from our table of open files
+			Semaphore* sem = (Semaphore*) currentThread->associatedSemaphores->getUnixFileID(file);
+			currentThread->associatedSemaphores->Close(file);
+			// Delete the dynamically created
+			delete sem;
+		}
+	}
+	
+	// Substract 1 from the father process tables' usage
+	if(currentThread->fatherProcess != NULL)
+	{
+		DEBUG('m', "Substracting 1 from father's usage\n");
+		currentThread->fatherProcess->openedFilesTable->delThread();
+		currentThread->fatherProcess->associatedSemaphores->delThread();
+	}
+	
+	// Signal the father if he used JOIN
+	DEBUG('m', "Check if the thread is being waited in a Join\n");
+	if(threadsTable->getUnixFileID(currentThread->pid) > 0 && threadsTable->getUnixFileID(currentThread->pid) < 128)
+	{ //it means that it contains a Semaphore adress (pointer) and that indeed JOIN was used
+		DEBUG('m', "Signal the father (pid = %d) %d\n", currentThread->pid, threadsTable->getUnixFileID(currentThread->pid));
+		Semaphore* sem = (Semaphore*) threadsTable->getUnixFileID(currentThread->pid);
+		sem->V();
+	}
+	
+	// Remove myself from the global threads table
+	DEBUG('m', "Removing from global threads table\n");
+	if(currentThread->pid >= 0 && currentThread->pid <= SIZE_OF_TABLE) //if I am a child process
+		threadsTable->Close(currentThread->pid);
+	
+	// Finally, finish the current thread
+	DEBUG('m', "Exiting exit\n");
 	currentThread->Finish();
+}
+
+// Secondary function of Nachos_Exec
+void nachosExecThread(void* filename)
+{
+	
+    OpenFile* executable = fileSystem->Open((const char*)filename);
+    AddrSpace* space;
+
+    if(executable == NULL)
+    {
+		printf("Unable to open file %s\n", (char*) filename);
+		return;
+    }
+    
+    space = new AddrSpace(executable);    
+    currentThread->space = space;
+
+    delete executable;			// close file
+
+    space->InitRegisters();		// set the initial register values
+    space->RestoreState();		// load page table register
+
+    machine->Run();			// jump to the user progam
+    ASSERT(false);	
+}
+
+// System call #2
+// Run the executable, stored in the Nachos file "name", and return the 
+// address space identifier
+void Nachos_Exec()
+{
+	// Read the file name from the user virtual memory
+	int virtualAdressOfParameter = machine->ReadRegister(4);
+	char filename[128] = {'\0'};
+	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
+	
+	// Create new thread and make it invoke kernel_fork
+	Thread* newThread = new Thread("Child", true, currentThread);
+	newThread->Fork(nachosExecThread, (void*) filename);
+	
+	// Return the pid of the child process
+	machine->WriteRegister(2, newThread->pid);
+}
+
+// System call #3
+// Join causes the father process to create a semaphore, store the
+// semaphore's adress in the global threads table and goes to sleep
+// using Wait()
+void Nachos_Join()
+{
+	// Obtain child pid as parameter
+	int childPID = machine->ReadRegister(4);
+	
+	if(threadsTable->isOpen(childPID)) //if it "is open", it means the process exists
+	{
+		// Create a semaphore that will be used to synch the father and child processes
+		Semaphore* fatherJoinsChild = new Semaphore("Join semaphore", 0);
+		// Store the semaphore's adress in the threadsTable
+		threadsTable->storeSemAdress(childPID, (long) fatherJoinsChild);
+		
+		// Wait for the child process to finish
+		fatherJoinsChild->P();
+		
+		// Return 0 on success
+		machine->WriteRegister(2, 0);
+	}
+	else
+		// Return -1 on failure
+		machine->WriteRegister(2, -1);
 }
 
 // System call #4
@@ -281,8 +412,9 @@ void Nachos_Close()
 	
 	// Check in the global linked list if this file is indeed open
 	// If is not close, do nothing; if it is open, close it
-	// Get the UnixFileID from our table for open files
+	// Get the UnixFileID from our table of open files
 	int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
+	currentThread->openedFilesTable->Close(NachosFileID);
 	// Use the Unix close system call
 	int result = close(UnixFileID);
 	
@@ -317,10 +449,16 @@ void Nachos_Fork()
 {
 	DEBUG('u', "Entering Fork System call\n");
 	// We need to create a new kernel thread to execute the user thread
-	Thread* newThread = new Thread( "Child-to-execute-Fork-code" );
-	currentThread->openedFilesTable->addThread();
-	// We need to share the Open File Table structure with this new child
+	Thread* newThread = new Thread("Child-to-execute-Fork-code", true, currentThread);
+	
+	// We need to copy the Table structures with this new child
 	newThread->openedFilesTable->copyTable(currentThread->openedFilesTable);
+	newThread->associatedSemaphores->copyTable(currentThread->associatedSemaphores);
+	newThread->openedFilesTable->initializeBoolTable();
+	
+	// Add this thread to the father tables
+	currentThread->openedFilesTable->addThread();
+	currentThread->associatedSemaphores->addThread();
 	
 	// Child and father will also share the same address space, except for the stack
 	// Text, init data and uninit data are shared, a new stack area must be created
@@ -354,7 +492,7 @@ void Nachos_SemCreate()
 	
 	// Get the next free position in the openFilesTable which is equivalent to this semaphoreID
 	// The semaphores are interpreted as files too
-	int semID = currentThread->openedFilesTable->Open((long)sem);
+	int semID = currentThread->associatedSemaphores->Open((long)sem);
 	
 	// Return semID
 	machine->WriteRegister(2, semID);
@@ -369,8 +507,8 @@ void Nachos_SemDestroy()
 	DEBUG('m', "Destroying semaphore with id: %d\n", semID);
 	
 	// Obtain the semaphoreID from openFilesTable  
-	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
-	currentThread->openedFilesTable->Close(semID);
+	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
+	currentThread->associatedSemaphores->Close(semID);
 	
 	// Invokes destroy so the threads in the semaphore queue don't stay asleep 
 	sem->Destroy();
@@ -385,7 +523,7 @@ void Nachos_SemSignal()
 	DEBUG('m', "Signaling semaphore with id: %d\n", semID);
 	
 	// Obtain the semaphoreID from openFilesTable  
-	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
+	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
 	sem->V();
 }
 
@@ -397,7 +535,7 @@ void Nachos_SemWait()
 	DEBUG('m', "Waiting semaphore with id: %d\n", semID);
 	
 	// Obtain the semaphoreID from openFilesTable  
-	Semaphore* sem = (Semaphore*)currentThread->openedFilesTable->getUnixFileID(semID);
+	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
 	sem->P();
 }
 
@@ -419,6 +557,12 @@ void ExceptionHandler(ExceptionType whichException)
 					break;
 				case SC_Exit:
 					Nachos_Exit();		// System call # 1
+					break;
+				case SC_Exec:
+					Nachos_Exec();		// System call # 2
+					break;
+				case SC_Join:
+					Nachos_Join();		// System call # 3
 					break;
 				case SC_Create:
 					Nachos_Create();	// System call # 4

@@ -41,6 +41,32 @@ Thread::Thread(const char* threadName)
 #ifdef USER_PROGRAM
     space = NULL;
     openedFilesTable = new openFilesTable;
+    associatedSemaphores = new openFilesTable;
+    fatherProcess = NULL;
+    pid = -1;
+	//DEBUG('m', "Se creó un hilo\n");
+#endif
+}
+
+
+//----------------------------------------------------------------------
+// Thread::Thread
+// 	Assigns a pid, invoked in Nachos_Fork
+//----------------------------------------------------------------------
+
+Thread::Thread(const char* threadName, bool isAChild, Thread* father)
+{
+    name = threadName;
+    stackTop = NULL;
+    stack = NULL;
+    status = JUST_CREATED;
+#ifdef USER_PROGRAM
+    space = NULL;
+    openedFilesTable = new openFilesTable;
+    associatedSemaphores = new openFilesTable;
+    fatherProcess = father;
+    pid = threadsTable->Open(0);	// All initialized in null.
+	//DEBUG('m', "Se creó un hilo hijo\n");
 #endif
 }
 
@@ -64,7 +90,9 @@ Thread::~Thread()
     if (stack != NULL)
 	DeallocBoundedArray((char*) stack, StackSize * sizeof(HostMemoryAddress));
 #ifdef USER_PROGRAM
+	delete space;
     delete openedFilesTable;
+    delete associatedSemaphores;
 #endif
 }
 
