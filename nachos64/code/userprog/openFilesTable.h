@@ -11,8 +11,8 @@
 class openFilesTable
 {
   public:
-    openFilesTable();       				// Initialize
-    openFilesTable(bool isThreadsTable);	// Initialize with -1 everywhere
+    openFilesTable();       				// Initialize, marking the first three positions
+    openFilesTable(bool isThreadsTable);	// Initialize, without marking any position, and with -1 everywhere if it is for the threadsTable
     ~openFilesTable();      				// De-allocate
     
     int Open(long UnixFileID); 							// Register the file ID

@@ -61,19 +61,15 @@ Semaphore::~Semaphore()
 //	when it is called.
 //----------------------------------------------------------------------
 
-void
-Semaphore::P()
+void Semaphore::P()
 {
 	IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
-	
 	while (value == 0) 			// semaphore not available
 	{
 		queue->Append(currentThread);		// so go to sleep
 		currentThread->Sleep();
 	} 
-	value--; 					// semaphore available, 
-								// consume its value
-	
+	value--; 					// semaphore available, consume its value
 	interrupt->SetLevel(oldLevel);		// re-enable interrupts
 }
 
@@ -85,8 +81,7 @@ Semaphore::P()
 //	are disabled when it is called.
 //----------------------------------------------------------------------
 
-void
-Semaphore::V()
+void Semaphore::V()
 {
 	Thread *thread;
 	IntStatus oldLevel = interrupt->SetLevel(IntOff);
@@ -105,8 +100,7 @@ Semaphore::V()
 //	This is used to destroy a user semaphore
 //----------------------------------------------------------------------
 
-void
-Semaphore::Destroy()
+void Semaphore::Destroy()
 {
 	Thread* thread;
 	IntStatus oldLevel = interrupt->SetLevel(IntOff);
@@ -125,29 +119,23 @@ Semaphore::Destroy()
 // the test case in the network assignment won't work!
 Lock::Lock(const char* debugName)
 {
-
 	char tmp[50];
-
 	name = (char*) debugName;
 	lockHolder = NULL;			// No process holds this lock
 	sprintf(tmp, "%s mutex", name);
 	mutex = new Semaphore(tmp, 1);
-
 }
-
 
 Lock::~Lock()
 {
 	delete mutex;
 }
 
-
 void Lock::Acquire()
 {
 	mutex->P();
 	lockHolder = currentThread;
 }
-
 
 void Lock::Release()
 {
@@ -156,12 +144,10 @@ void Lock::Release()
 	mutex->V();
 }
 
-
 bool Lock::isHeldByCurrentThread()
 {
    return (lockHolder == currentThread);
 }
-
 
 Condition::Condition(const char* debugName)
 {
@@ -169,19 +155,15 @@ Condition::Condition(const char* debugName)
 	waitQueue = new List<Semaphore *>;
 }
 
-
 Condition::~Condition()
 {
 	delete waitQueue;
 }
 
-
 void Condition::Wait( Lock * conditionLock )
 {
 	Semaphore* waiter;
-
 	ASSERT( conditionLock->isHeldByCurrentThread() );
-
 	waiter = new Semaphore("condition", 0);
 	waitQueue->Append(waiter);
 	conditionLock->Release();		// Release lock before sleeping
@@ -190,13 +172,10 @@ void Condition::Wait( Lock * conditionLock )
 	delete waiter;
 }
 
-
 void Condition::Signal( Lock * conditionLock )
 {
 	Semaphore* waiter;
-
 	ASSERT( conditionLock->isHeldByCurrentThread() );
-
 	if(!waitQueue->IsEmpty())
 	{
 		waiter = waitQueue->Remove();
@@ -204,12 +183,8 @@ void Condition::Signal( Lock * conditionLock )
 	}
 }
 
-
 void Condition::Broadcast( Lock* conditionLock )
 {
 	while(!waitQueue->IsEmpty())
-	{
 		Signal( conditionLock );
-	}
 }
-

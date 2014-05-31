@@ -111,7 +111,7 @@ void Nachos_Exit()
 	
 	// Delete the associated semaphores (created by the current thread)
 	DEBUG('u', "Deleting semaphores\n");
-	for(unsigned int sem=3; sem<SIZE_OF_TABLE; ++sem)
+	for(unsigned int sem=0; sem<SIZE_OF_TABLE; ++sem)
 	{
 		if(currentThread->associatedSemaphores->isOpen(sem) && currentThread->associatedSemaphores->openedByCurrentThread[sem])
 		{
@@ -282,16 +282,14 @@ void Nachos_Read()
 	// Determine where to read from
 	switch(NachosFileID)
 	{
-		case ConsoleInput:	//User can read from standard input, always open
+		case ConsoleInput:	// User can read from standard input, always open
 			// Need a semaphore to control access to console
-			// Console->P();
-			// machine->consoleMutexSem->P(); //attempt to do that
-			for(int i=0; i<bufferSize; ++i) //to control the amount of chars read
-				scanf("%c", buffer+i); //apparently ok to use scanf
-			buffer[bufferSize] = '\0'; //just in case
+			consoleMutexSem->P(); // Wait
+			for(int i=0; i<bufferSize; ++i) // to control the amount of chars read
+				scanf("%c", buffer+i); // apparently ok to use scanf
+			buffer[bufferSize] = '\0'; // just in case
 			// Update simulation stats, see details in Statistics class in machine/stats.cc
-			// Console->V();
-			// machine->consoleMutexSem->V(); //attempt to do that
+			consoleMutexSem->V(); // Signal
 			break;
 		case ConsoleOutput: //User can not read from stdout
 			machine->WriteRegister(2, -1);
@@ -341,20 +339,18 @@ void Nachos_Write()
 	// Determine where to write
 	switch(NachosFileID)
 	{
-		case ConsoleInput:	//User can not write to standard input
+		case ConsoleInput:	// User can not write to standard input
 			machine->WriteRegister(2, -1);
 			break;
-		case ConsoleOutput: //User can write to stdout, always open
+		case ConsoleOutput: // User can write to stdout, always open
 			// Need a semaphore to control access to console
-			// Console->P();
-			// machine->consoleMutexSem->P(); //attempt to do that
-			buffer[bufferSize] = '\0'; //apparently necessary
-			printf("%s", buffer); //apparently ok to use printf
+			consoleMutexSem->P(); // Wait
+			buffer[bufferSize] = '\0'; // apparently necessary
+			printf("%s", buffer); // apparently ok to use printf
 			// Update simulation stats, see details in Statistics class in machine/stats.cc
-			// Console->V();
-			// machine->consoleMutexSem->V(); //attempt to do that
+			consoleMutexSem->V(); // Signal
 			break;
-		case ConsoleError: //This trick permits to write ints to console
+		case ConsoleError: // This trick permits to write ints to console
 			printf("%d\n", machine->ReadRegister(4));
 			break;
 		default: // All other opened files

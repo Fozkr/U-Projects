@@ -71,7 +71,8 @@ enum ThreadStatus { JUST_CREATED, RUNNING, READY, BLOCKED };
 //  Some threads also belong to a user address space; threads
 //  that only run in the kernel have a NULL address space.
 
-class Thread {
+class Thread
+{
   private:
     // NOTE: DO NOT CHANGE the order of these first two members.
     // THEY MUST be in this position for SWITCH to work.
@@ -79,71 +80,54 @@ class Thread {
     HostMemoryAddress machineState[MachineStateSize];	// all registers except for stackTop
 
   public:
-    Thread(const char* debugName);	// initialize a Thread 
-    Thread(const char* threadName, bool isAChild, Thread* father);  // initialize a thread with a pid
+    Thread(const char* debugName);									// initialize a Thread 
+    Thread(const char* threadName, bool isAChild, Thread* father);  // initialize a child Thread with a pid and a pointer to its father
     ~Thread(); 				// deallocate a Thread
-					// NOTE -- thread being deleted
-					// must not be running when delete 
-					// is called
+							// NOTE -- thread being deleted must not be running when delete is called
 
     // basic thread operations
-
     void Fork(VoidFunctionPtr func, void* arg);	// Make thread run (*func)(arg)
-    void Yield();  				// Relinquish the CPU if any 
-						// other thread is runnable
-    void Sleep();  				// Put the thread to sleep and 
-						// relinquish the processor
-    void Finish();  				// The thread is done executing
-    
-    void CheckOverflow();   			// Check if thread has 
-						// overflowed its stack
+    void Yield();  								// Relinquish the CPU if any other thread is runnable
+    void Sleep();  								// Put the thread to sleep and relinquish the processor
+    void Finish();  							// The thread is done executing
+    void CheckOverflow();   					// Check if thread has overflowed its stack
     void setStatus(ThreadStatus st) { status = st; }
     const char* getName() { return (name); }
     void Print() { printf("%s, ", name); }
 
   private:
     // some of the private data for this class is listed above
-    
-    HostMemoryAddress* stack; 		// Bottom of the stack 
-					// NULL if this is the main thread
-					// (If NULL, don't deallocate stack)
-    ThreadStatus status;		// ready, running or blocked
+    HostMemoryAddress* stack; 		// Bottom of the stack, NULL if this is the main thread
+									// (If NULL, don't deallocate stack)
+	ThreadStatus status;			// ready, running or blocked
     const char* name;
-
-    void StackAllocate(VoidFunctionPtr func, void* arg);
-    					// Allocate a stack for thread.
-					// Used internally by Fork()
+    void StackAllocate(VoidFunctionPtr func, void* arg);	// Allocate a stack for thread. Used internally by Fork()
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 
-// one for its state while executing user code, one for its state 
-// while executing kernel code.
-
+// one for its state while executing user code, one for its state while executing kernel code.
     int userRegisters[NumTotalRegs];	// user-level CPU register state
 
   public:
-    void SaveUserState();		// save user-level register state
-    void RestoreUserState();		// restore user-level register state
+    void SaveUserState();				// save user-level register state
+    void RestoreUserState();			// restore user-level register state
 
-    AddrSpace* space;			// User code this thread is running.
-    openFilesTable* openedFilesTable;	// new class that contains a table with the files opened by each thread
+    AddrSpace* space;						// User code this thread is running.
+    openFilesTable* openedFilesTable;		// new class that contains a table with the files opened by each thread
     openFilesTable* associatedSemaphores;	// Table that contains semaphore pointers
-    Thread* fatherProcess;	// A pointer to the father thread, used only in child processes, after Nachos_Fork
-    int pid;
+    Thread* fatherProcess;					// A pointer to the father thread, used only in child processes, after Nachos_Fork
+    int pid;								// Process/thread Nachos identifier
 #endif
 };
 
 // Magical machine-dependent routines, defined in switch.s
-
-extern "C" {
-// First frame on thread execution stack; 
-//   	enable interrupts
-//	call "func"
-//	(when func returns, if ever) call ThreadFinish()
+extern "C"
+{
+// First frame on thread execution stack; enable interrupts
+// call "func" (when func returns, if ever) call ThreadFinish()
 void ThreadRoot();
 
 // Stop running oldThread and start running newThread
 void SWITCH(Thread *oldThread, Thread *newThread);
 }
-
 #endif // THREAD_H

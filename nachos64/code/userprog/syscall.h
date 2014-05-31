@@ -18,8 +18,8 @@
 
 #define SIZE_OF_TABLE 128	// ALSO defined in openFilesTable.h, modify at the same time
 
-/* system call codes -- used by the stubs to tell the kernel which system call
- * is being asked for
+/* system call codes -- used by the stubs to tell the kernel which
+ * system call is being asked for
  */
 #define SC_Halt		0				// Check
 #define SC_Exit		1

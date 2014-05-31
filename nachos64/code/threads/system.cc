@@ -13,13 +13,12 @@
 // These are all initialized and de-allocated by this file.
 
 Thread* currentThread;			// the thread we are running now
-Thread* threadToBeDestroyed;  		// the thread that just finished
+Thread* threadToBeDestroyed;  	// the thread that just finished
 Scheduler* scheduler;			// the ready list
 Interrupt* interrupt;			// interrupt status
-Statistics* stats;			// performance metrics
-Timer* timer;				// the hardware timer device,
-					// for invoking context switches
-					
+Statistics* stats;				// performance metrics
+Timer* timer;					// the hardware timer device, for invoking context switches
+
 // 2007, Jose Miguel Santos Espino
 PreemptiveScheduler* preemptiveScheduler = NULL;
 const long long DEFAULT_TIME_SLICE = 50000;
@@ -33,22 +32,18 @@ SynchDisk* synchDisk;
 #endif
 
 #ifdef USER_PROGRAM	// requires either FILESYS or FILESYS_STUB
-Machine* machine;	// user program memory and registers
-BitMap* mainMemoryMap; // the map represents the PAGES, not the bytes
-openFilesTable* threadsTable; // global table of threads where the positions correspond to the pids
-//Semaphore* consoleMutexSem;
+Machine* machine;				// user program memory and registers
+BitMap* mainMemoryMap;			// the map represents the PAGES, not the bytes
+openFilesTable* threadsTable;	// global table of threads where the positions correspond to the pids
+Semaphore* consoleMutexSem;		// Mutex sempahore used to control access to the console
 #endif
 
 #ifdef NETWORK
 PostOffice* postOffice;
 #endif
 
-
 // External definition, to allow us to take a pointer to this function
 extern void Cleanup();
-
-
-
 
 //----------------------------------------------------------------------
 // TimerInterruptHandler
@@ -67,8 +62,7 @@ extern void Cleanup();
 //	"dummy" is because every interrupt handler takes one argument,
 //		whether it needs it or not.
 //----------------------------------------------------------------------
-static void
-TimerInterruptHandler(void* dummy)
+static void TimerInterruptHandler(void* dummy)
 {
     if (interrupt->getStatus() != IdleMode)
 	interrupt->YieldOnReturn();
@@ -84,13 +78,11 @@ TimerInterruptHandler(void* dummy)
 //	"argv" is an array of strings, one for each command line argument
 //		ex: "nachos -d +" -> argv = {"nachos", "-d", "+"}
 //----------------------------------------------------------------------
-void
-Initialize(int argc, char **argv)
+void Initialize(int argc, char **argv)
 {
     int argCount;
     const char* debugArgs = "";
     bool randomYield = false;
-    
 
 // 2007, Jose Miguel Santos Espino
     bool preemptiveScheduling = false;
@@ -180,13 +172,10 @@ Initialize(int argc, char **argv)
 
     
 #ifdef USER_PROGRAM
-    machine = new Machine(debugUserProg);	// this must come first
-	mainMemoryMap = new BitMap(NumPhysPages); // the map represents the PAGES, not the bytes
-	threadsTable = new openFilesTable(true);
-	//Semaphore* consoleMutexSem = new Semaphore("Console mutex", 1);
-	mainMemoryMap->Mark(0); //stdin
-	mainMemoryMap->Mark(1); //stdout
-	mainMemoryMap->Mark(2); //stderr
+    machine = new Machine(debugUserProg);		// this must come first
+	mainMemoryMap = new BitMap(NumPhysPages);	// the map represents the PAGES, not the bytes
+	threadsTable = new openFilesTable(true);	// global table of created threads (main thread not included), positions="pid"s
+	consoleMutexSem = new Semaphore("Console mutex", 1);
 #endif
 
 #ifdef FILESYS
@@ -206,8 +195,7 @@ Initialize(int argc, char **argv)
 // Cleanup
 // 	Nachos is halting.  De-allocate global data structures.
 //----------------------------------------------------------------------
-void
-Cleanup()
+void Cleanup()
 {
 
     printf("\nCleaning up...\n");
@@ -222,7 +210,7 @@ Cleanup()
 #ifdef USER_PROGRAM
     delete machine;
     delete mainMemoryMap;
-    //delete consoleMutexSem;
+    delete consoleMutexSem;
 #endif
 
 #ifdef FILESYS_NEEDED
@@ -239,4 +227,3 @@ Cleanup()
     
     Exit(0);
 }
-

@@ -40,8 +40,9 @@ Thread::Thread(const char* threadName)
     status = JUST_CREATED;
 #ifdef USER_PROGRAM
     space = NULL;
-    openedFilesTable = new openFilesTable;
-    associatedSemaphores = new openFilesTable;
+    // Added:
+    openedFilesTable = new openFilesTable();
+    associatedSemaphores = new openFilesTable(false);
     fatherProcess = NULL;
     pid = -1;
 #endif
@@ -50,7 +51,7 @@ Thread::Thread(const char* threadName)
 
 //----------------------------------------------------------------------
 // Thread::Thread
-// 	Assigns a pid, invoked in Nachos_Fork
+// 	Assigns a pid and a pointer to its father, invoked in Nachos_Fork.
 //----------------------------------------------------------------------
 
 Thread::Thread(const char* threadName, bool isAChild, Thread* father)
@@ -61,8 +62,9 @@ Thread::Thread(const char* threadName, bool isAChild, Thread* father)
     status = JUST_CREATED;
 #ifdef USER_PROGRAM
     space = NULL;
-    openedFilesTable = new openFilesTable;
-    associatedSemaphores = new openFilesTable;
+    // Added:
+    openedFilesTable = new openFilesTable();
+    associatedSemaphores = new openFilesTable(false);
     fatherProcess = father;
     pid = threadsTable->Open(0);
 #endif
