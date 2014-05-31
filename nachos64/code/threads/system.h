@@ -15,6 +15,7 @@
 #include "interrupt.h"
 #include "stats.h"
 #include "timer.h"
+#include "synch.h" //*****
 
 // Initialization and cleanup routines
 extern void Initialize(int argc, char **argv); 	// Initialization,
@@ -34,6 +35,7 @@ extern Timer* timer;				// the hardware alarm clock
 extern Machine* machine;		// user program memory and registers
 extern BitMap* mainMemoryMap;	// bit map of nachos main memory PAGES used for multiprogramming support
 extern openFilesTable* threadsTable;	// global table of threads where the positions correspond to the pids 
+extern Semaphore* consoleMutexSem;	//Mutex sempahore used to control the access to the console
 #endif
 
 #ifdef FILESYS_NEEDED 		// FILESYS or FILESYS_STUB 

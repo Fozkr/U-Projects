@@ -154,9 +154,6 @@ class Machine {
     char *mainMemory;		// physical memory to store user program,
 				// code and data, while executing
     int registers[NumTotalRegs]; // CPU registers, for executing user programs
-#ifdef USER_PROGRAM
-    //Semaphore* consoleMutexSem;	//Mutex sempahore used to control the access to the console (writing)
-#endif
 
 
 // NOTE: the hardware translation of virtual addresses in the user program
