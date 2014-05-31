@@ -21,6 +21,7 @@
 // All rights reserved.  See copyright.h for copyright notice and limitation 
 // of liability and disclaimer of warranty provisions.
 
+//Nachos stuff
 #include "copyright.h"
 #include "system.h"
 #include "syscall.h"
@@ -28,36 +29,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-//----------------------------------------------------------------------
-// ExceptionHandler
-// 	Entry point into the Nachos kernel.  Called when a user program
-//	is executing, and either does a syscall, or generates an addressing
-//	or arithmetic exception.
-//
-// 	For system calls, the following is the calling convention:
-//
-// 	system call code -- r2
-//		arg1 -- r4
-//		arg2 -- r5
-//		arg3 -- r6
-//		arg4 -- r7
-//
-//	The result of the system call, if any, must be put back into r2. 
-//
-// And don't forget to increment the pc before returning.(Or else you'll
-// loop making the same system call forever!
-//
-//	"which" is the kind of exception.  The list of possible exceptions 
-//	are in machine.h.
-//----------------------------------------------------------------------
-
-// Modify the registers in order for the user program to continue running
-// normally after the system call execution.
+// Modify the registers in order for the user program to continue
+// running normally after any system call execution.
 void returnFromSystemCall()
 {
 	DEBUG('u', "Modifying registers to simulate return from system call\n");
 	int pc, npc;
-
 	pc = machine->ReadRegister(PCReg);
 	npc = machine->ReadRegister(NextPCReg);
 	machine->WriteRegister(PrevPCReg, pc);		// PrevPC <- PC
@@ -66,7 +43,7 @@ void returnFromSystemCall()
 }
 
 // Read of write data (mainly chars) BYTE BY BYTE from/to the virtual
-// user memory.
+// Nachos user memory.
 void readOrWriteVirtualMemory(bool read, char* array, long virtualAdress)
 {
 	int i = 0;
@@ -93,27 +70,31 @@ void readOrWriteVirtualMemory(bool read, char* array, long virtualAdress)
 }
 
 // System call #0
-// Halts the entire operating system and exits
+// Halt
+// Halts the entire operating system and exits.
 void Nachos_Halt()
 {
 	DEBUG('u', "Shutdown, initiated by user program.\n");
 	interrupt->Halt();
 
-}	//Halt
+}
 
 // System call #1
 // Exit
+// The current thread exits, it must wait for its child processes to
+// finish, close open files, delete semaphores, update father's usage,
+// signal the father if it is waiting in a Join, remove itself from the
+// threadsTable and delete its adress space from the memory.
 void Nachos_Exit()
 {
 	DEBUG('u', "Exiting through system call, pid: %d\n", currentThread->pid);
+	
 	// First wait for the child processes to finish
 	DEBUG('u', "Waiting for child processes\n");
 	while(currentThread->openedFilesTable->getUsage()>1 && currentThread->associatedSemaphores->getUsage()>1) //while there are active child processes
 		currentThread->Yield(); //just wait
 	
-	// Free the adress space, done in the adress space destructor, invoked by the thread destructor AT THE END
-	
-	// Close the open files (opened by the current thread)
+	// Close the open files (that were opened by the current thread)
 	DEBUG('u', "Closing files\n");
 	for(unsigned int file=3; file<SIZE_OF_TABLE; ++file) // Start with 3, becuase 0, 1, 2 are reserved
 	{
@@ -130,20 +111,20 @@ void Nachos_Exit()
 	
 	// Delete the associated semaphores (created by the current thread)
 	DEBUG('u', "Deleting semaphores\n");
-	for(unsigned int file=3; file<SIZE_OF_TABLE; ++file) // Start with 3, becuase 0, 1, 2 are reserved
+	for(unsigned int sem=0; sem<SIZE_OF_TABLE; ++sem)
 	{
-		if(currentThread->associatedSemaphores->isOpen(file) && currentThread->associatedSemaphores->openedByCurrentThread[file])
+		if(currentThread->associatedSemaphores->isOpen(sem) && currentThread->associatedSemaphores->openedByCurrentThread[sem])
 		{
 			// Simulate Nachos_Close call
-			// Get the UnixFileID from our table of open files
-			Semaphore* sem = (Semaphore*) currentThread->associatedSemaphores->getUnixFileID(file);
-			currentThread->associatedSemaphores->Close(file);
+			// Get the UnixsemID from our table of open sems
+			Semaphore* semaph = (Semaphore*) currentThread->associatedSemaphores->getUnixFileID(sem);
+			currentThread->associatedSemaphores->Close(sem);
 			// Delete the dynamically created
-			delete sem;
+			delete semaph;
 		}
 	}
 	
-	// If this is a child process
+	// If this is a child process...
 	if(currentThread->fatherProcess != NULL)
 	{
 		// Substract 1 from the father process tables' usage
@@ -169,6 +150,8 @@ void Nachos_Exit()
 	// Finally, finish the current thread
 	DEBUG('u', "Exiting exit\n");
 	currentThread->Finish();
+	
+	// Free the adress space, done in the adress space destructor, invoked by the thread destructor
 }
 
 // Secondary function of Nachos_Exec
@@ -204,12 +187,9 @@ void Nachos_Exec()
 {
 	// Read the file name from the user virtual memory
 	long virtualAdressOfParameter = (long) machine->ReadRegister(4);
-	//char filename[128] = {'\0'};
-	//readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
 	
-	// Create new thread and make it invoke kernel_fork
+	// Create new thread and make it invoke kernel_Fork
 	Thread* newThread = new Thread("Child", true, currentThread);
-	//newThread->Fork(nachosExecThread, (void*) filename);
 	newThread->Fork(nachosExecThread, (void*) virtualAdressOfParameter);
 	
 	// Return the pid of the child process
@@ -254,13 +234,10 @@ void Nachos_Create()
 	DEBUG('u', "Creating a file with filename: %s\n", filename);
 	
 	// Unix creat
-	int UnixFileID = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
-	
+	creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
+	//int UnixFileID = creat(filename, S_IRWXU | S_IRWXG | S_IRWXO);
 	// Verify for errors
 	//if(UnixFileID < 0)
-	
-	// Return the UnixFileID
-	machine->WriteRegister(2, UnixFileID);
 }
 
 // System call #5
@@ -274,9 +251,6 @@ void Nachos_Open()
 	readOrWriteVirtualMemory(true, filename, virtualAdressOfParameter);
 	DEBUG('u', "Opening a file with filename: %s\n", filename);
 	
-	//TODO: create a global linked list that contains the names of all opened files
-	// Check if the file is already open
-	
 	// Open the file using the Linux system call
 	//filesystem->Open(filename); //find out if this is necessary
 	int UnixFileID = open(filename, O_RDWR);
@@ -285,6 +259,7 @@ void Nachos_Open()
 	int NachosFileID = currentThread->openedFilesTable->Open(UnixFileID);
 	
 	// Verify for errors
+	//if(UnixFileID < 0)
 
 	// Return the NachosFileID
 	machine->WriteRegister(2, NachosFileID);
@@ -321,9 +296,8 @@ void Nachos_Read()
 		case ConsoleOutput: //User can not read from stdout
 			machine->WriteRegister(2, -1);
 			break;
-		case ConsoleError: //...not sure what to do here, find out later***
-			//This trick permits to write ints to console
-			//printf("%d\n", machine->ReadRegister(4));
+		case ConsoleError:
+			// Should not read
 			break;
 		default: // All other opened files
 			// Verify if file is open, if not, return -1 in register2
@@ -341,7 +315,6 @@ void Nachos_Read()
 				machine->WriteRegister(2, -1);
 			break;
     }
-    
     // Now that it has read into the new buffer, copy to original buffer
 	readOrWriteVirtualMemory(false, buffer, virtualAdressOfBuffer);
     
@@ -400,7 +373,6 @@ void Nachos_Write()
 				machine->WriteRegister(2, -1);
 			break;
     }
-    
     // Delete the dynamic buffer
     delete buffer;
 }
@@ -413,18 +385,18 @@ void Nachos_Close()
 	int NachosFileID = machine->ReadRegister(4);
 	DEBUG('u', "Closing a file with fileID: %d\n", NachosFileID);
 	
-	// Check in the global linked list if this file is indeed open
-	// If is not close, do nothing; if it is open, close it
-	// Get the UnixFileID from our table of open files
-	int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
-	currentThread->openedFilesTable->Close(NachosFileID);
-	// Use the Unix close system call
-	int result = close(UnixFileID);
-	
-	// Verify for errors with result
-	
-	// Return the result
-	machine->WriteRegister(2, result);
+	// Check if this file is indeed open. If is not, do nothing.
+	if(currentThread->openedFilesTable->isOpen(NachosFileID))
+	{
+		// If it is open, close it. Get the UnixFileID from the table
+		int UnixFileID = currentThread->openedFilesTable->getUnixFileID(NachosFileID);
+		currentThread->openedFilesTable->Close(NachosFileID);
+		// Use the Unix close system call
+		close(UnixFileID);
+		//int result = close(UnixFileID);
+		// Verify for errors with result
+		//if(result < 0)
+	}
 }
 
 // Secondary function for Nachos_Fork
@@ -467,9 +439,6 @@ void Nachos_Fork()
 	// Child and father will also share the same address space, except for the stack
 	// Text, init data and uninit data are shared, a new stack area must be created
 	// for the new child
-	// We suggest the use of a new constructor in AddrSpace class,
-	// This new constructor will copy the shared segments (space variable) from currentThread, passed
-	// as a parameter, and create a new stack for the new child
 	newThread->space = new AddrSpace(currentThread->space);
 
 	// We (kernel)-Fork to a new method to execute the child code
@@ -495,7 +464,6 @@ void Nachos_SemCreate()
 	Semaphore* sem = new Semaphore("Sempahore created in system call",initialValueOfSemaphore);
 	
 	// Get the next free position in the openFilesTable which is equivalent to this semaphoreID
-	// The semaphores are interpreted as files too
 	int semID = currentThread->associatedSemaphores->Open((long)sem);
 	
 	// Return semID
@@ -514,7 +482,7 @@ void Nachos_SemDestroy()
 	Semaphore* sem = (Semaphore*)currentThread->associatedSemaphores->getUnixFileID(semID);
 	currentThread->associatedSemaphores->Close(semID);
 	
-	// Invokes destroy so the threads in the semaphore queue don't stay asleep 
+	// Invokes destroy so the threads in the semaphore queue do not stay asleep 
 	sem->Destroy();
 	delete sem;
 }
@@ -543,9 +511,25 @@ void Nachos_SemWait()
 	sem->P();
 }
 
-// The exception handler, it is invoked whenever a system call is used
-// and it handles what to do when any of them is used; it invokes each
-// one of the previous functions as required.
+//----------------------------------------------------------------------
+// ExceptionHandler
+// 	Entry point into the Nachos kernel.  Called when a user program
+//	is executing, and either does a syscall, or generates an addressing
+//	or arithmetic exception.
+//
+// 	For system calls, the following is the calling convention:
+//
+// 	system call code -- r2
+//		arg1 -- r4
+//		arg2 -- r5
+//		arg3 -- r6
+//		arg4 -- r7
+//
+//	The result of the system call, if any, must be put back into r2. 
+//
+//	"which" is the kind of exception.  The list of possible exceptions 
+//	are in machine.h.
+//----------------------------------------------------------------------
 void ExceptionHandler(ExceptionType whichException)
 {
     //DEBUG('u', "Entering ExceptionHandler with exception: %d\n", whichException);

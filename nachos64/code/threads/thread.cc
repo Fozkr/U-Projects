@@ -44,7 +44,6 @@ Thread::Thread(const char* threadName)
     associatedSemaphores = new openFilesTable;
     fatherProcess = NULL;
     pid = -1;
-	//DEBUG('m', "Se creó un hilo\n");
 #endif
 }
 
@@ -65,8 +64,7 @@ Thread::Thread(const char* threadName, bool isAChild, Thread* father)
     openedFilesTable = new openFilesTable;
     associatedSemaphores = new openFilesTable;
     fatherProcess = father;
-    pid = threadsTable->Open(0);	// All initialized in null.
-	//DEBUG('m', "Se creó un hilo hijo\n");
+    pid = threadsTable->Open(0);
 #endif
 }
 

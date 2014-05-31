@@ -80,7 +80,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
     ASSERT(numPages <= NumPhysPages);	// check we are not trying to
 										// run anything too big
 										// (at least until we have
-										// virtual memory) MODIFY THIS*****
+										// virtual memory)
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, size);
 	// first, set up the translation

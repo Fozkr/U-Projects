@@ -104,7 +104,7 @@ void openFilesTable::initializeBoolTable()
 // Copy the table from the father process, the whole class (usage, vector, bitmap and bool vector)
 void openFilesTable::copyTable(openFilesTable* otherTable)
 {
-	//usage = otherTable->usage; //PORQUE NO NECESITAMOS COPIAR LA VARA PARA EL EXIIITTTT!!!	lml
+	//usage = otherTable->usage; // Decided to remove this for Nachos_Exit ease
 	for(int i=0; i<SIZE_OF_TABLE; ++i)
 	{
 		openFiles[i] = otherTable->openFiles[i];
