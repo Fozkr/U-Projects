@@ -58,7 +58,7 @@ main.o: ../threads/main.cc ../threads/copyright.h ../threads/utility.h \
  ../filesys/openfile.h ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
  ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
- ../machine/timer.h
+ ../machine/timer.h ../threads/synch.h
 scheduler.o: ../threads/scheduler.cc ../threads/copyright.h \
  ../threads/scheduler.h ../threads/list.h ../threads/utility.h \
  ../machine/sysdep.h ../userprog/copyright.h /usr/include/stdlib.h \
@@ -90,7 +90,7 @@ scheduler.o: ../threads/scheduler.cc ../threads/copyright.h \
  ../userprog/copyright.h ../filesys/filesys.h ../filesys/openfile.h \
  ../userprog/openFilesTable.h ../userprog/bitmap.h ../filesys/openfile.h \
  ../threads/system.h ../machine/interrupt.h ../threads/list.h \
- ../machine/stats.h ../machine/timer.h
+ ../machine/stats.h ../machine/timer.h ../threads/synch.h
 synch.o: ../threads/synch.cc ../threads/copyright.h ../threads/synch.h \
  ../threads/thread.h ../threads/utility.h ../machine/sysdep.h \
  ../userprog/copyright.h /usr/include/stdlib.h /usr/include/features.h \
@@ -155,7 +155,7 @@ system.o: ../threads/system.cc ../threads/copyright.h ../threads/system.h \
  ../userprog/openFilesTable.h ../userprog/bitmap.h ../filesys/openfile.h \
  ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
  ../threads/list.h ../machine/stats.h ../machine/timer.h \
- ../threads/preemptive.h
+ ../threads/synch.h ../threads/preemptive.h
 thread.o: ../threads/thread.cc ../threads/copyright.h ../threads/thread.h \
  ../threads/utility.h ../machine/sysdep.h ../userprog/copyright.h \
  /usr/include/stdlib.h /usr/include/features.h \
@@ -250,7 +250,7 @@ threadtest.o: ../threads/threadtest.cc /usr/include/unistd.h \
  ../userprog/openFilesTable.h ../userprog/bitmap.h ../filesys/openfile.h \
  ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
  ../threads/list.h ../machine/stats.h ../machine/timer.h \
- ../threads/dinningph.h ../threads/synch.h \
+ ../threads/synch.h ../threads/dinningph.h \
  /usr/include/x86_64-linux-gnu/bits/timex.h /usr/include/wait.h \
  /usr/include/x86_64-linux-gnu/sys/wait.h /usr/include/signal.h \
  /usr/include/x86_64-linux-gnu/bits/signum.h \
@@ -324,7 +324,8 @@ interrupt.o: ../machine/interrupt.cc ../userprog/copyright.h \
  ../userprog/addrspace.h ../userprog/copyright.h ../filesys/filesys.h \
  ../filesys/openfile.h ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
- ../machine/interrupt.h ../machine/stats.h ../machine/timer.h
+ ../machine/interrupt.h ../machine/stats.h ../machine/timer.h \
+ ../threads/synch.h
 sysdep.o: ../machine/sysdep.cc ../userprog/copyright.h \
  /usr/include/stdio.h /usr/include/features.h \
  /usr/include/x86_64-linux-gnu/bits/predefs.h \
@@ -387,7 +388,7 @@ sysdep.o: ../machine/sysdep.cc ../userprog/copyright.h \
  ../userprog/copyright.h ../filesys/filesys.h ../filesys/openfile.h \
  ../userprog/openFilesTable.h ../userprog/bitmap.h ../filesys/openfile.h \
  ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
- ../machine/stats.h ../machine/timer.h
+ ../machine/stats.h ../machine/timer.h ../threads/synch.h
 stats.o: ../machine/stats.cc ../userprog/copyright.h ../threads/utility.h \
  ../threads/copyright.h ../machine/sysdep.h /usr/include/stdlib.h \
  /usr/include/features.h /usr/include/x86_64-linux-gnu/bits/predefs.h \
@@ -446,7 +447,7 @@ timer.o: ../machine/timer.cc ../userprog/copyright.h ../machine/timer.h \
  ../filesys/openfile.h ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
  ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
- ../machine/timer.h
+ ../machine/timer.h ../threads/synch.h
 preemptive.o: ../threads/preemptive.cc ../threads/preemptive.h \
  ../threads/system.h ../threads/copyright.h ../threads/utility.h \
  ../machine/sysdep.h ../userprog/copyright.h /usr/include/stdlib.h \
@@ -479,7 +480,8 @@ preemptive.o: ../threads/preemptive.cc ../threads/preemptive.h \
  ../userprog/openFilesTable.h ../userprog/bitmap.h ../filesys/openfile.h \
  ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
  ../threads/list.h ../machine/stats.h ../machine/timer.h \
- /usr/include/unistd.h /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
+ ../threads/synch.h /usr/include/unistd.h \
+ /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
  /usr/include/x86_64-linux-gnu/bits/environments.h \
  /usr/include/x86_64-linux-gnu/bits/confname.h /usr/include/getopt.h \
  /usr/include/x86_64-linux-gnu/sys/ptrace.h \
@@ -525,8 +527,8 @@ addrspace.o: ../userprog/addrspace.cc ../userprog/copyright.h \
  ../filesys/filesys.h ../filesys/openfile.h ../userprog/openFilesTable.h \
  ../userprog/bitmap.h ../filesys/openfile.h ../threads/scheduler.h \
  ../threads/list.h ../machine/interrupt.h ../threads/list.h \
- ../machine/stats.h ../machine/timer.h ../userprog/addrspace.h \
- ../bin/noff.h
+ ../machine/stats.h ../machine/timer.h ../threads/synch.h \
+ ../userprog/addrspace.h ../bin/noff.h
 bitmap.o: ../userprog/bitmap.cc ../userprog/copyright.h \
  ../userprog/bitmap.h ../threads/utility.h ../threads/copyright.h \
  ../machine/sysdep.h ../userprog/copyright.h /usr/include/stdlib.h \
@@ -585,8 +587,8 @@ exception.o: ../userprog/exception.cc ../userprog/copyright.h \
  ../filesys/filesys.h ../filesys/openfile.h ../userprog/openFilesTable.h \
  ../userprog/bitmap.h ../filesys/openfile.h ../threads/scheduler.h \
  ../threads/list.h ../machine/interrupt.h ../threads/list.h \
- ../machine/stats.h ../machine/timer.h ../userprog/syscall.h \
- ../threads/synch.h /usr/include/fcntl.h \
+ ../machine/stats.h ../machine/timer.h ../threads/synch.h \
+ ../userprog/syscall.h ../threads/synch.h /usr/include/fcntl.h \
  /usr/include/x86_64-linux-gnu/bits/fcntl.h \
  /usr/include/x86_64-linux-gnu/bits/uio.h \
  /usr/include/x86_64-linux-gnu/bits/stat.h /usr/include/unistd.h \
@@ -624,8 +626,8 @@ progtest.o: ../userprog/progtest.cc ../userprog/copyright.h \
  ../filesys/filesys.h ../filesys/openfile.h ../userprog/openFilesTable.h \
  ../userprog/bitmap.h ../filesys/openfile.h ../threads/scheduler.h \
  ../threads/list.h ../machine/interrupt.h ../threads/list.h \
- ../machine/stats.h ../machine/timer.h ../machine/console.h \
- ../userprog/addrspace.h ../threads/synch.h
+ ../machine/stats.h ../machine/timer.h ../threads/synch.h \
+ ../machine/console.h ../userprog/addrspace.h ../threads/synch.h
 console.o: ../machine/console.cc ../userprog/copyright.h \
  ../machine/console.h ../threads/utility.h ../threads/copyright.h \
  ../machine/sysdep.h /usr/include/stdlib.h /usr/include/features.h \
@@ -658,7 +660,7 @@ console.o: ../machine/console.cc ../userprog/copyright.h \
  ../filesys/openfile.h ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
  ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
- ../machine/timer.h
+ ../machine/timer.h ../threads/synch.h
 machine.o: ../machine/machine.cc ../userprog/copyright.h \
  ../machine/machine.h ../threads/utility.h ../threads/copyright.h \
  ../machine/sysdep.h /usr/include/stdlib.h /usr/include/features.h \
@@ -691,7 +693,7 @@ machine.o: ../machine/machine.cc ../userprog/copyright.h \
  ../filesys/openfile.h ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
  ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
- ../machine/timer.h
+ ../machine/timer.h ../threads/synch.h
 mipssim.o: ../machine/mipssim.cc ../userprog/copyright.h \
  ../machine/machine.h ../threads/utility.h ../threads/copyright.h \
  ../machine/sysdep.h /usr/include/stdlib.h /usr/include/features.h \
@@ -724,7 +726,7 @@ mipssim.o: ../machine/mipssim.cc ../userprog/copyright.h \
  ../filesys/filesys.h ../filesys/openfile.h ../userprog/openFilesTable.h \
  ../userprog/bitmap.h ../filesys/openfile.h ../threads/scheduler.h \
  ../threads/list.h ../machine/interrupt.h ../threads/list.h \
- ../machine/stats.h ../machine/timer.h
+ ../machine/stats.h ../machine/timer.h ../threads/synch.h
 translate.o: ../machine/translate.cc ../userprog/copyright.h \
  ../machine/machine.h ../threads/utility.h ../threads/copyright.h \
  ../machine/sysdep.h /usr/include/stdlib.h /usr/include/features.h \
@@ -757,7 +759,7 @@ translate.o: ../machine/translate.cc ../userprog/copyright.h \
  ../machine/machine.h ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
  ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
- ../machine/timer.h
+ ../machine/timer.h ../threads/synch.h
 openFilesTable.o: ../userprog/openFilesTable.cc \
  ../userprog/openFilesTable.h ../userprog/bitmap.h \
  ../userprog/copyright.h ../threads/utility.h ../threads/copyright.h \

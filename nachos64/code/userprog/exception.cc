@@ -111,7 +111,7 @@ void Nachos_Exit()
 	
 	// Delete the associated semaphores (created by the current thread)
 	DEBUG('u', "Deleting semaphores\n");
-	for(unsigned int sem=0; sem<SIZE_OF_TABLE; ++sem)
+	for(unsigned int sem=3; sem<SIZE_OF_TABLE; ++sem)
 	{
 		if(currentThread->associatedSemaphores->isOpen(sem) && currentThread->associatedSemaphores->openedByCurrentThread[sem])
 		{
