@@ -290,6 +290,7 @@ void Nachos_Read()
 			buffer[bufferSize] = '\0'; // just in case
 			// Update simulation stats, see details in Statistics class in machine/stats.cc
 			consoleMutexSem->V(); // Signal
+			machine->WriteRegister(2, 0); // return 0
 			break;
 		case ConsoleOutput: //User can not read from stdout
 			machine->WriteRegister(2, -1);
@@ -349,6 +350,7 @@ void Nachos_Write()
 			printf("%s", buffer); // apparently ok to use printf
 			// Update simulation stats, see details in Statistics class in machine/stats.cc
 			consoleMutexSem->V(); // Signal
+			machine->WriteRegister(2, 0); // return 0
 			break;
 		case ConsoleError: // This trick permits to write ints to console
 			printf("%d\n", machine->ReadRegister(4));
