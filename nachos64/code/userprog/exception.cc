@@ -590,6 +590,12 @@ void ExceptionHandler(ExceptionType whichException)
 			}
 			returnFromSystemCall(); //Update the pc registers
 			break;
+		case PageFaultException:
+			consoleMutexSem->P(); // Wait
+			printf("Page Fault Exception detected.\nVirtual adress: &d\nPage number: &d\n", machine->ReadRegister(39));
+			consoleMutexSem->V(); // Signal
+			ASSERT(false);
+			break;
 		default:
 			printf("Unexpected exception %d\n", whichException);
 			ASSERT(false);

@@ -64,7 +64,7 @@ Machine::Machine(bool debug)
 #ifdef USE_TLB
     tlb = new TranslationEntry[TLBSize];
     for (i = 0; i < TLBSize; i++)
-	tlb[i].valid = false;
+		tlb[i].valid = false;
     pageTable = NULL;
 #else	// use linear page table
     tlb = NULL;
@@ -89,7 +89,6 @@ Machine::~Machine()
     delete [] mainMemory;
     if (tlb != NULL)
         delete [] tlb;
-    //delete consoleMutexSem;
 }
 
 //----------------------------------------------------------------------
