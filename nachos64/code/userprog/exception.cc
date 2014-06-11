@@ -592,7 +592,10 @@ void ExceptionHandler(ExceptionType whichException)
 			break;
 		case PageFaultException:
 			consoleMutexSem->P(); // Wait
-			printf("Page Fault Exception detected.\nVirtual adress: &d\nPage number: &d\n", machine->ReadRegister(39));
+			printf("Page Fault Exception detected.\nVirtual adress: %d, Page number: %d\n", machine->ReadRegister(39), machine->ReadRegister(39)/PageSize);
+			printf("Bit validez: %d, Bit de suciedad: %d, Página de %s\n", currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].valid,
+																		 currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].dirty,
+																		 currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].readOnly? "texto (código)" : "datos o stack");
 			consoleMutexSem->V(); // Signal
 			ASSERT(false);
 			break;

@@ -16,7 +16,7 @@
 #include "copyright.h"
 #include "filesys.h"
 
-#define UserStackSize		1024 	// increase this as necessary!
+#define UserStackSize		1024 		// increase this as necessary!
 
 class AddrSpace
 {
@@ -27,17 +27,24 @@ class AddrSpace
 	AddrSpace(AddrSpace* otherSpace);	// Create an address space as copy 
 										// of another adress space (father process's)
     ~AddrSpace();						// De-allocate an address space
-
     void InitRegisters();				// Initialize user-level CPU registers,
 										// before jumping to user code
-
     void SaveState();					// Save/restore address space-specific
     void RestoreState();				// info on a context switch 
+    TranslationEntry* getPageTable();	// Quickly retrieve the pageTable in order to access page properties
+    
+    public:
+    unsigned int numPagesInitData;		// Used to know when to read from the executable file or not
 
   private:
     TranslationEntry* pageTable;		// Assume linear page table translation
 										// for now!
-    unsigned int numPages;				// Number of pages in the virtual 
+	OpenFile* executableFile;			// To read when it is necessary /*Verificar que nadie lo cierre*/
+	unsigned int numPages;				// Number of pages in the virtual 
+										// address space
+    unsigned int numPagesCode;			// Number of pages of code in the virtual 
+										// address space
+	unsigned int numPagesDataStack;		// Number of pages of data and stack in the virtual 
 										// address space
 };
 

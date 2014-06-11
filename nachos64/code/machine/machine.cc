@@ -73,10 +73,6 @@ Machine::Machine(bool debug)
 
     singleStep = debug;
     CheckEndian();
-
-#ifdef USER_PROGRAM
-    //consoleMutexSem = new Sempahore("Console Sempahore", 1);
-#endif
 }
 
 //----------------------------------------------------------------------
