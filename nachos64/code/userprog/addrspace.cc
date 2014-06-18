@@ -64,8 +64,6 @@ AddrSpace::AddrSpace(OpenFile* executable)
 	
     NoffHeader noffH;
     unsigned int i, sizeOfCode, sizeOfDataStack;
-    
-    executableFile = executable;
 
     executable->ReadAt((char*) &noffH, sizeof(noffH), 0);
     if ((noffH.noffMagic != NOFFMAGIC) && 
@@ -82,6 +80,7 @@ AddrSpace::AddrSpace(OpenFile* executable)
     numPages = numPagesCode + numPagesDataStack;
     sizeOfCode = numPagesCode * PageSize;
     sizeOfDataStack = numPagesDataStack * PageSize;
+    // store the number of initData pages for future reference
     numPagesInitData = divRoundUp(noffH.initData.size,PageSize);
 
     ASSERT(numPages <= NumPhysPages);		// check we are not trying to
@@ -92,6 +91,7 @@ AddrSpace::AddrSpace(OpenFile* executable)
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, sizeOfCode + sizeOfDataStack);
 	// first, set up the translation
     pageTable = new TranslationEntry[numPages];
+/*
     // First the code
     for(i=0; i<numPagesCode; ++i) // reserves pages for uninitData and stack too
     {
@@ -109,7 +109,7 @@ AddrSpace::AddrSpace(OpenFile* executable)
 		pageTable[i].use = false;
 		pageTable[i].dirty = false;
 		pageTable[i].readOnly = true;  // if the code segment was entirely on 
-										// a separate page, we could set its 
+										// a separate page, we can set its 
 										// pages to be read-only
     }
     // Second, the data and stack
@@ -128,9 +128,29 @@ AddrSpace::AddrSpace(OpenFile* executable)
 #endif
 		pageTable[i].use = false;
 		pageTable[i].dirty = false;
-		pageTable[i].readOnly = false;  // if the code segment was entirely on 
-										// a separate page, we could set its 
-										// pages to be read-only
+		pageTable[i].readOnly = false;
+    }
+*/
+	// Reserve pages
+    for(i=0; i<numPages; ++i)
+    {
+		pageTable[i].virtualPage = i;
+		// Added on lab 9
+#ifndef VM
+		int nextFreePhysicalPage = mainMemoryMap->Find();
+		DEBUG('a', "nextFreePhysicalPage: %d\n", nextFreePhysicalPage);
+		pageTable[i].physicalPage = nextFreePhysicalPage;
+		pageTable[i].valid = true;
+#else
+		pageTable[i].physicalPage = -1;
+		pageTable[i].valid = false;
+#endif
+		pageTable[i].use = false;
+		pageTable[i].dirty = false;
+		if(i < numPagesCode)
+			pageTable[i].readOnly = true;	// if the code segment is entirely on a separate page, we can set its pages to be read-only
+		else
+			pageTable[i].readOnly = false;
     }
     
 	// zero out the entire address space, to zero the unitialized data
@@ -179,6 +199,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 	DEBUG('a', "Copying address space, num pages: %d\n", numPages);
 	unsigned int i;
     pageTable = new TranslationEntry[numPages];
+/*
     // First the code
     for(i=0; i<numPagesCode; ++i)
     {
@@ -215,6 +236,27 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 		pageTable[i].readOnly = false;  // if the code segment was entirely on 
 										// a separate page, we could set its 
 										// pages to be read-only
+    }
+*/
+	// Reserve pages
+	for(i=0; i<(numPages - UserStackSize/PageSize); ++i)
+    {
+		DEBUG('a', "Copying code, initdata and uninitdata, page: %d\n", i);
+		pageTable[i].virtualPage = otherSpace->pageTable[i].virtualPage;
+		// Added on lab 9
+#ifndef VM
+		pageTable[i].physicalPage = otherSpace->pageTable[i].physicalPage;
+		pageTable[i].valid = true;
+#else
+		pageTable[i].physicalPage = -1;
+		pageTable[i].valid = false;
+#endif
+		pageTable[i].use = false;
+		pageTable[i].dirty = false;
+		if(i < numPagesCode)
+			pageTable[i].readOnly = true;	// if the code segment is entirely on a separate page, we can set its pages to be read-only
+		else
+			pageTable[i].readOnly = false;
     }
     // Use the same "i" from before, but run the for structure 8 times (the stack uses 8 pages)
     for(unsigned int k=0; k<(UserStackSize/PageSize); k++) // reserves pages for uninitData and stack too
@@ -335,7 +377,8 @@ void AddrSpace::RestoreState()
 #endif
 }
 
-TranslationEntry* AddrSpace::getPageTable()
-{
-	return pageTable;
-}
+TranslationEntry* AddrSpace::getPageTable()		{return pageTable;}
+unsigned int AddrSpace::getNumPagesCode()		{return numPagesCode;}
+unsigned int AddrSpace::getNumPagesInitData()	{return numPagesInitData;}
+char* AddrSpace::getFilename()					{return executableFilename;}
+

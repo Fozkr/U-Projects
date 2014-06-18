@@ -31,19 +31,24 @@ class AddrSpace
 										// before jumping to user code
     void SaveState();					// Save/restore address space-specific
     void RestoreState();				// info on a context switch 
-    TranslationEntry* getPageTable();	// Quickly retrieve the pageTable in order to access page properties
+    TranslationEntry* getPageTable();	// Quickly retrieve the pageTable
+    unsigned int getNumPagesCode();		// Quickly retrieve the numPagesCode
+    unsigned int getNumPagesInitData();	// Quickly retrieve the numPagesInitData
+	char* getFilename();				// Quickly retrieve the Filename
     
-    public:
-    unsigned int numPagesInitData;		// Used to know when to read from the executable file or not
+  public:
 
   private:
     TranslationEntry* pageTable;		// Assume linear page table translation
 										// for now!
-	OpenFile* executableFile;			// To read when it is necessary /*Verificar que nadie lo cierre*/
+	char* executableFilename;			// To read when it is necessary
+	
 	unsigned int numPages;				// Number of pages in the virtual 
 										// address space
     unsigned int numPagesCode;			// Number of pages of code in the virtual 
 										// address space
+    unsigned int numPagesInitData;		// Used to know when to read from the executable file or not
+    
 	unsigned int numPagesDataStack;		// Number of pages of data and stack in the virtual 
 										// address space
 };

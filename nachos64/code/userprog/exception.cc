@@ -169,6 +169,7 @@ void nachosExecThread(void* virtualAdressOfParameter)
     }
     
     space = new AddrSpace(executable);
+    strcpy(space->getFilename(), filename);
     currentThread->space = space;
 
     delete executable;			// close file
@@ -336,6 +337,7 @@ void Nachos_Write()
 	DEBUG('u', "Writing to a file with fileID: %d\n", NachosFileID);
 	// Read from virtual memory into that buffer
 	readOrWriteVirtualMemory(true, buffer, virtualAdressOfBuffer);
+	DEBUG('u', "Read: %s\n", buffer);
 	
 	// Determine where to write
 	switch(NachosFileID)
@@ -532,6 +534,9 @@ void ExceptionHandler(ExceptionType whichException)
 {
     //DEBUG('u', "Entering ExceptionHandler with exception: %d\n", whichException);
 	int type = machine->ReadRegister(2);
+	
+	bool validBit, dirtyBit, readOnlyBit; // Used for handling page fault exceptions
+	
 	switch(whichException)
 	{
 		case SyscallException:
@@ -592,11 +597,35 @@ void ExceptionHandler(ExceptionType whichException)
 			break;
 		case PageFaultException:
 			consoleMutexSem->P(); // Wait
+			validBit = currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].valid;
+			dirtyBit = currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].dirty;
+			readOnlyBit = currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].readOnly;
 			printf("Page Fault Exception detected.\nVirtual adress: %d, Page number: %d\n", machine->ReadRegister(39), machine->ReadRegister(39)/PageSize);
-			printf("Bit validez: %d, Bit de suciedad: %d, Página de %s\n", currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].valid,
-																		 currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].dirty,
-																		 currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].readOnly? "texto (código)" : "datos o stack");
+			printf("Bit validez: %d, Bit de suciedad: %d, readOnly: %d\n", validBit, dirtyBit, readOnlyBit);
 			consoleMutexSem->V(); // Signal
+			if(!validBit) // if the page is not valid
+			{
+				if(!dirtyBit) // if the page is dirty
+				{
+					if(readOnlyBit ||
+					machine->ReadRegister(39)/PageSize < (currentThread->space->getNumPagesCode() + currentThread->space->getNumPagesInitData()))
+					// if it is readOnly, it is code, if the pagenumber is < than numPagesCode+numPagesInitData, then it is initData
+					{
+						// The readOnly page has not been loaded to memory, it must be loaded from disk
+						//int physicalPage = pageTable[i].physicalPage;
+						//executable->ReadAt(&(machine->mainMemory[physicalPage * PageSize]), PageSize, noffH.code.inFileAddr + (i * PageSize));
+					}
+					else
+					{
+						// The page has not been loaded to memory, but it is either initData or uninitData & stack
+						// if it is initData, it must be loaded from memory
+						// if it is uninitData or Stack, it must not be loaded from memory, just reserve space
+					}
+				}
+			}
+			else // the page is valid
+			{
+			}
 			ASSERT(false);
 			break;
 		default:
