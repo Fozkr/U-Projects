@@ -77,20 +77,19 @@ AddrSpace::AddrSpace(OpenFile* executable)
     numPagesCode = divRoundUp(sizeOfCode, PageSize);
     numPagesDataStack = divRoundUp(sizeOfDataStack, PageSize);
     numPages = numPagesCode + numPagesDataStack;
+    DEBUG('a', "numpages: %d\n", numPages);
     sizeOfCode = numPagesCode * PageSize;
     sizeOfDataStack = numPagesDataStack * PageSize;
     // store the number of initData pages for future reference
     numPagesInitData = divRoundUp(noffH.initData.size,PageSize);
-			DEBUG('a', "numpagesinitdata: %d\n", numPagesInitData);
-
-    ASSERT(numPages <= NumPhysPages);		// check we are not trying to
-											// run anything too big
-											// (at least until we have
-											// virtual memory)
-
+	DEBUG('a', "numpagesinitdata: %d\n", numPagesInitData);
+#ifndef VM
+    ASSERT(numPages <= NumPhysPages);	// check we are not trying to run anything too big (at least until we have virtual memory)
+#endif
 	executableFilename = new char[32]; // 32 for now
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, sizeOfCode + sizeOfDataStack);
+    DEBUG('a', "code: %d, initData: %d, uninitData: %d\n", divRoundUp(noffH.code.size, PageSize), divRoundUp(noffH.initData.size, PageSize), divRoundUp(noffH.uninitData.size, PageSize));
 	// first, set up the translation
     pageTable = new TranslationEntry[numPages];
 /*
@@ -149,7 +148,7 @@ AddrSpace::AddrSpace(OpenFile* executable)
 #endif
 		pageTable[i].use = false;
 		pageTable[i].dirty = false;
-		if(i < numPagesCode)
+		if(i < numPagesCode-1) //the last code page, is not read only, because it also has initData
 			pageTable[i].readOnly = true;	// if the code segment is entirely on a separate page, we can set its pages to be read-only
 		else
 			pageTable[i].readOnly = false;

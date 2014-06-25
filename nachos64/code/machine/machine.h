@@ -25,6 +25,10 @@
 #include "utility.h"
 #include "translate.h"
 #include "disk.h"
+#include "bitmap.h"//***
+//Unix stuff (create, open, close, remove SWAP file)
+#include <fcntl.h>
+#include <unistd.h>
 
 // Definitions related to the size, and format of user memory
 
@@ -55,17 +59,17 @@ enum ExceptionType
 // any two instructions (thus we need to keep track of things like load
 // delay slots, etc.)
 
-#define StackReg	29	// User's stack pointer
-#define RetAddrReg	31	// Holds return address for procedure calls
-#define NumGPRegs	32	// 32 general purpose registers on MIPS
-#define HiReg		32	// Double register to hold multiply result
-#define LoReg		33
-#define PCReg		34	// Current program counter
-#define NextPCReg	35	// Next program counter (for branch delay) 
-#define PrevPCReg	36	// Previous program counter (for debugging)
-#define LoadReg		37	// The register target of a delayed load.
+#define StackReg		29	// User's stack pointer
+#define RetAddrReg		31	// Holds return address for procedure calls
+#define NumGPRegs		32	// 32 general purpose registers on MIPS
+#define HiReg			32	// Double register to hold multiply result
+#define LoReg			33
+#define PCReg			34	// Current program counter
+#define NextPCReg		35	// Next program counter (for branch delay) 
+#define PrevPCReg		36	// Previous program counter (for debugging)
+#define LoadReg			37	// The register target of a delayed load.
 #define LoadValueReg 	38	// The value to be loaded by a delayed load.
-#define BadVAddrReg	39	// The failing virtual address on an exception
+#define BadVAddrReg		39	// The failing virtual address on an exception
 
 #define NumTotalRegs 	40
 
@@ -102,7 +106,8 @@ class Instruction {
 // The procedures in this class are defined in machine.cc, mipssim.cc, and
 // translate.cc.
 
-class Machine {
+class Machine
+{
   public:
     Machine(bool debug);	// Initialize the simulation of the hardware
 				// for running user programs
@@ -151,7 +156,7 @@ class Machine {
 // Note that *all* communication between the user program and the kernel 
 // are in terms of these data structures.
 
-    char *mainMemory;					// physical memory to store user program,
+    char* mainMemory;					// physical memory to store user program,
 										// code and data, while executing
 	unsigned short mainMemoryIterator;	// To iterate through the main memory when replacing (0 - 31)
     int registers[NumTotalRegs];		// CPU registers, for executing user programs
@@ -175,18 +180,22 @@ class Machine {
 // Thus the TLB pointer should be considered as *read-only*, although 
 // the contents of the TLB are free to be modified by the kernel software.
 
-    TranslationEntry *tlb;		// this pointer should be considered 
-								// "read-only" to Nachos kernel code
-	unsigned short tlbIterator;	// To iterate through the tlb when replacing (0 - 3)
+    TranslationEntry* tlb;			// this pointer should be considered 
+									// "read-only" to Nachos kernel code
+	unsigned short tlbIterator;		// To iterate through the tlb when replacing (0 - 3)
+	unsigned long* invertedTable;	// To store the Thread* to access the threads when replacing them from main memory
+	unsigned int* invertedTableVP;	// To store the virtual pages associated to those threads and to the physical pages
+	unsigned int SWAPUnixFileID;	// To store the UNIX file ID of the swap file
+	BitMap* SWAPmap;				// To control access to the SWAP file
 
-    TranslationEntry *pageTable;
+    TranslationEntry* pageTable;
     unsigned int pageTableSize;
 
   private:
     bool singleStep;		// drop back into the debugger after each
-				// simulated instruction
+							// simulated instruction
     int runUntilTime;		// drop back into the debugger when simulated
-				// time reaches this value
+							// time reaches this value
 };
 
 extern void ExceptionHandler(ExceptionType which);
