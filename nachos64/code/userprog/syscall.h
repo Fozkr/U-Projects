@@ -15,6 +15,7 @@
 
 #include "copyright.h"
 #include "synch.h"
+#include "noff.h" //***
 
 #define SIZE_OF_TABLE 128	// ALSO defined in openFilesTable.h, modify at the same time
 

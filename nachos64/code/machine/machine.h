@@ -151,9 +151,10 @@ class Machine {
 // Note that *all* communication between the user program and the kernel 
 // are in terms of these data structures.
 
-    char *mainMemory;		// physical memory to store user program,
-				// code and data, while executing
-    int registers[NumTotalRegs]; // CPU registers, for executing user programs
+    char *mainMemory;					// physical memory to store user program,
+										// code and data, while executing
+	unsigned short mainMemoryIterator;	// To iterate through the main memory when replacing (0 - 31)
+    int registers[NumTotalRegs];		// CPU registers, for executing user programs
 
 
 // NOTE: the hardware translation of virtual addresses in the user program
@@ -175,7 +176,8 @@ class Machine {
 // the contents of the TLB are free to be modified by the kernel software.
 
     TranslationEntry *tlb;		// this pointer should be considered 
-					// "read-only" to Nachos kernel code
+								// "read-only" to Nachos kernel code
+	unsigned short tlbIterator;	// To iterate through the tlb when replacing (0 - 3)
 
     TranslationEntry *pageTable;
     unsigned int pageTableSize;

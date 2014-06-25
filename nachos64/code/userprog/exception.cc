@@ -69,6 +69,25 @@ void readOrWriteVirtualMemory(bool read, char* array, long virtualAdress)
 	}
 }
 
+// 
+void updateTLB(unsigned int virtualPageNumber)
+{
+	// Simply add to the tlb
+	while(machine->tlb[machine->tlbIterator].use) // while it finds pages "in use", set that to false
+	{
+		machine->tlb[machine->tlbIterator].use = false;
+		machine->tlbIterator = (machine->tlbIterator + 1) % TLBSize;
+	}
+	// finally it finds a page "not in use", so add the there the one that caused the fault
+	DEBUG('u', "Moving page to tlb[%d], virtual page number: %d\n", machine->tlbIterator, virtualPageNumber);
+	machine->tlb[machine->tlbIterator].virtualPage = virtualPageNumber;
+	machine->tlb[machine->tlbIterator].physicalPage = currentThread->space->getPageTable()[virtualPageNumber].physicalPage;
+	machine->tlb[machine->tlbIterator].valid = currentThread->space->getPageTable()[virtualPageNumber].valid;
+	machine->tlb[machine->tlbIterator].use = currentThread->space->getPageTable()[virtualPageNumber].use;
+	machine->tlb[machine->tlbIterator].dirty = currentThread->space->getPageTable()[virtualPageNumber].dirty;
+	machine->tlb[machine->tlbIterator].readOnly = currentThread->space->getPageTable()[virtualPageNumber].readOnly;
+}
+
 // System call #0
 // Halt
 // Halts the entire operating system and exits.
@@ -535,7 +554,8 @@ void ExceptionHandler(ExceptionType whichException)
     //DEBUG('u', "Entering ExceptionHandler with exception: %d\n", whichException);
 	int type = machine->ReadRegister(2);
 	
-	bool validBit, dirtyBit, readOnlyBit; // Used for handling page fault exceptions
+	bool validBit, dirtyBit, readOnlyBit;	// Used for handling page fault exceptions
+	unsigned int virtualPageNumber;			// Used for handling page fault exceptions
 	
 	switch(whichException)
 	{
@@ -596,37 +616,61 @@ void ExceptionHandler(ExceptionType whichException)
 			returnFromSystemCall(); //Update the pc registers
 			break;
 		case PageFaultException:
-			consoleMutexSem->P(); // Wait
-			validBit = currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].valid;
-			dirtyBit = currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].dirty;
-			readOnlyBit = currentThread->space->getPageTable()[machine->ReadRegister(39)/PageSize].readOnly;
-			printf("Page Fault Exception detected.\nVirtual adress: %d, Page number: %d\n", machine->ReadRegister(39), machine->ReadRegister(39)/PageSize);
-			printf("Bit validez: %d, Bit de suciedad: %d, readOnly: %d\n", validBit, dirtyBit, readOnlyBit);
-			consoleMutexSem->V(); // Signal
-			if(!validBit) // if the page is not valid
+			virtualPageNumber = machine->ReadRegister(39)/PageSize;
+			validBit = currentThread->space->getPageTable()[virtualPageNumber].valid;
+			dirtyBit = currentThread->space->getPageTable()[virtualPageNumber].dirty;
+			readOnlyBit = currentThread->space->getPageTable()[virtualPageNumber].readOnly;
+			DEBUG('u', "Page Fault Exception detected.\nVirtual adress: %d, Page number: %d\n", machine->ReadRegister(39), virtualPageNumber);
+			DEBUG('u', "Bit validez: %d, Bit de suciedad: %d, readOnly: %d\n", validBit, dirtyBit, readOnlyBit);
+			if(!validBit) // if the page is not valid (IS NOT IN PAGE TABLE)
 			{
-				if(!dirtyBit) // if the page is dirty
+				//DEBUG('u', "valid bit false\n");
+				if(!dirtyBit) // if the page is not dirty
 				{
-					if(readOnlyBit ||
-					machine->ReadRegister(39)/PageSize < (currentThread->space->getNumPagesCode() + currentThread->space->getNumPagesInitData()))
-					// if it is readOnly, it is code, if the pagenumber is < than numPagesCode+numPagesInitData, then it is initData
-					{
-						// The readOnly page has not been loaded to memory, it must be loaded from disk
-						//int physicalPage = pageTable[i].physicalPage;
-						//executable->ReadAt(&(machine->mainMemory[physicalPage * PageSize]), PageSize, noffH.code.inFileAddr + (i * PageSize));
-					}
-					else
-					{
-						// The page has not been loaded to memory, but it is either initData or uninitData & stack
-						// if it is initData, it must be loaded from memory
+					//DEBUG('u', "dirty bit false\n");
+					// It is code, initData, uninitData or stack, all of them need to reserve space
+					DEBUG('u', "Reserving space...\n");
+						// The page has not been loaded to memory, but it is either uninitData or stack
 						// if it is uninitData or Stack, it must not be loaded from memory, just reserve space
+						if(mainMemoryMap->NumClear() == 0) // if there are no free frames
+						{ 
+							mainMemoryMap->Clear(machine->mainMemoryIterator);
+							machine->mainMemoryIterator = (machine->mainMemoryIterator + 1) % NumPhysPages;
+						}	
+						int nextFreeFrame = mainMemoryMap->Find();
+						//bzero(machine->mainMemory[nextFreeFrame*PageSize], PageSize); // clean frame
+						currentThread->space->getPageTable()[virtualPageNumber].physicalPage = nextFreeFrame;
+						currentThread->space->getPageTable()[virtualPageNumber].valid = true;
+						// Next add to the tlb
+						updateTLB(virtualPageNumber);
+						
+					if(readOnlyBit || virtualPageNumber < (currentThread->space->getNumPagesCode() + currentThread->space->getNumPagesInitData()))
+					{
+						// if it is readOnly, it is code, if the pagenumber is < than numPagesCode+numPagesInitData, then it is initData
+						DEBUG('u', "It is code or initData, loading from disk to main memory...\n");
+						// The readOnly page has not been loaded to memory, it must be loaded from disk
+						OpenFile* executable = fileSystem->Open(currentThread->space->getFilename());
+						NoffHeader noffH;
+						executable->ReadAt((char*) &noffH, sizeof(noffH), 0);
+						//if ((noffH.noffMagic != NOFFMAGIC) && (WordToHost(noffH.noffMagic) == NOFFMAGIC))
+						//	SwapHeader(&noffH);
+						ASSERT(noffH.noffMagic == NOFFMAGIC);
+						executable->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, noffH.code.inFileAddr + (virtualPageNumber * PageSize));
 					}
 				}
+				else
+				{
+					DEBUG('u', "dirty bit true!!!\n");
+					// read it from SWAP
+				}
 			}
-			else // the page is valid
+			else // the page is valid (IS IN THE PAGE TABLE)
 			{
+				DEBUG('u', "Valid bit false, updating the TLB\n");
+				// Simply add to the tlb
+				updateTLB(virtualPageNumber);
 			}
-			ASSERT(false);
+			//ASSERT(false);
 			break;
 		default:
 			printf("Unexpected exception %d\n", whichException);

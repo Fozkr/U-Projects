@@ -63,6 +63,8 @@ Machine::Machine(bool debug)
       	mainMemory[i] = 0;
 #ifdef USE_TLB
     tlb = new TranslationEntry[TLBSize];
+    tlbIterator = 0; //added on 2/24/6
+    mainMemoryIterator = 0; //added on 2/24/6
     for (i = 0; i < TLBSize; i++)
 		tlb[i].valid = false;
     pageTable = NULL;
