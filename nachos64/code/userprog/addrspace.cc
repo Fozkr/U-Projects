@@ -92,6 +92,7 @@ AddrSpace::AddrSpace(OpenFile* executable)
     DEBUG('w', "code: %d, initData: %d, uninitData: %d\n", divRoundUp(noffH.code.size, PageSize), divRoundUp(noffH.initData.size, PageSize), divRoundUp(noffH.uninitData.size, PageSize));
 	// first, set up the translation
     pageTable = new TranslationEntry[numPages];
+    DEBUG('w', "pageTable original adress: %d\n", (long) pageTable);
 /*
     // First the code
     for(i=0; i<numPagesCode; ++i) // reserves pages for uninitData and stack too
@@ -200,6 +201,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 	DEBUG('a', "Copying address space, num pages: %d\n", numPages);
 	unsigned int i;
     pageTable = new TranslationEntry[numPages];
+    DEBUG('w', "pageTable copy original adress: %d\n", (long) pageTable);
     executableFilename = new char[32]; // 32 for now
     strcpy(executableFilename, otherSpace->getFilename());
 /*
@@ -304,11 +306,11 @@ AddrSpace::~AddrSpace()
 			if(pageTable[page].physicalPage >=0 && mainMemoryMap->Test(pageTable[page].physicalPage))
 				mainMemoryMap->Clear(pageTable[page].physicalPage);
 	}
-	DEBUG('a', "Deleting pageTable: %li\n", (long) pageTable);
+	DEBUG('w', "Deleting pageTable: %li\n", (long) pageTable);
 	delete[] pageTable;
-	DEBUG('a', "Deleting executableFilename\n");
+	DEBUG('w', "Deleting executableFilename\n");
 	delete[] executableFilename;
-	DEBUG('a', "Done\n");
+	DEBUG('w', "Done\n");
 }
 
 //----------------------------------------------------------------------
@@ -359,7 +361,7 @@ void AddrSpace::SaveState()
 		pageTable[machine->tlb[i].virtualPage].use = machine->tlb[i].use;
 		pageTable[machine->tlb[i].virtualPage].dirty = machine->tlb[i].dirty;
 	}
-	DEBUG('u', "SAVEDSTATE\n");
+	//DEBUG('u', "SAVEDSTATE\n");
 #endif
 }
 

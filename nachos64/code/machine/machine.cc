@@ -54,7 +54,7 @@ void CheckEndian()
 
 Machine::Machine(bool debug)
 {
-    int i;
+    unsigned int i;
 
     for (i = 0; i < NumTotalRegs; i++)
         registers[i] = 0;

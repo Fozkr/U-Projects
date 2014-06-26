@@ -180,9 +180,9 @@ bool Machine::WriteMem(int addr, int size, int value)
 
 ExceptionType Machine::Translate(int virtAddr, int* physAddr, int size, bool writing)
 {
-    int i;
+    unsigned int i;
     unsigned int vpn, offset;
-    TranslationEntry *entry;
+    TranslationEntry* entry;
     unsigned int pageFrame;
 
     DEBUG('a', "\tTranslate 0x%x, %s: ", virtAddr, writing ? "write" : "read");
