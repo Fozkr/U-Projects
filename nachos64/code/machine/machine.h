@@ -185,7 +185,7 @@ class Machine
 	unsigned short tlbIterator;		// To iterate through the tlb when replacing (0 - 3)
 	unsigned long* invertedTable;	// To store the Thread* to access the threads when replacing them from main memory
 	unsigned int* invertedTableVP;	// To store the virtual pages associated to those threads and to the physical pages
-	unsigned int SWAPUnixFileID;	// To store the UNIX file ID of the swap file
+	OpenFile* SWAP;					// To store the UNIX file ID of the swap file
 	BitMap* SWAPmap;				// To control access to the SWAP file
 
     TranslationEntry* pageTable;

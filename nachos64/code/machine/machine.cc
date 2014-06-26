@@ -72,10 +72,12 @@ Machine::Machine(bool debug)
     invertedTable = new unsigned long[NumPhysPages];
     invertedTableVP = new unsigned int[NumPhysPages];
     creat("SWAP", S_IRWXU | S_IRWXG | S_IRWXO);
-    SWAPUnixFileID = open("SWAP", O_RDWR);
+    SWAP = fileSystem->Open("SWAP");
     SWAPmap = new BitMap(NumPhysPages*2); // twice the main memory size
-    for(unsigned int k=0; k<NumPhysPages*2*PageSize; ++k)
-		write(SWAPUnixFileID, "0", 1);
+    //for(unsigned int k=0; k<NumPhysPages*2*PageSize; ++k)
+	//	write(SWAPUnixFileID, "0", 1);
+	for(unsigned int k=0; k<NumPhysPages*2*PageSize; ++k)
+		SWAP->Write(" ", 1);
 #else	// use linear page table
     tlb = NULL;
     pageTable = NULL;
@@ -99,12 +101,10 @@ Machine::~Machine()
 		delete[] invertedTable;
 	if(invertedTableVP != NULL)
 		delete[] invertedTableVP;
+	if(SWAP != NULL)
+		delete SWAP;
 	if(SWAPmap != NULL)
 		delete SWAPmap;
-#ifdef USE_TLB
-	close(SWAPUnixFileID);
-	remove("SWAP");
-#endif
 }
 
 //----------------------------------------------------------------------
