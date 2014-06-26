@@ -82,7 +82,7 @@ void updateTLB(unsigned int virtualPageNumber)
 		machine->tlb[machine->tlbIterator].use = false;
 		machine->tlbIterator = (machine->tlbIterator + 1) % TLBSize;
 	}
-	// finally it finds a page "not in use", so add the there the one that caused the fault
+	// finally it finds a page "not in use", so add there the one that caused the fault
 	DEBUG('u', "Moving page to tlb[%d], virtual page number: %d\n", machine->tlbIterator, virtualPageNumber);
 	machine->tlb[machine->tlbIterator].virtualPage = virtualPageNumber;
 	machine->tlb[machine->tlbIterator].physicalPage = currentThread->space->getPageTable()[virtualPageNumber].physicalPage;
@@ -96,7 +96,7 @@ void updateTLB(unsigned int virtualPageNumber)
 void storeInSWAP(Thread* otherThread, unsigned int physicalPageReplaced, unsigned int virtualPageReplaced)
 {
 	unsigned int nextFreeSWAPFrame = machine->SWAPmap->Find(); // For now we will assume the SWAP never gets full
-	std::ofstream SWAPfile;
+	std::ofstream SWAPfile; //FIX THIS
 	SWAPfile.seekp(nextFreeSWAPFrame*PageSize);
 	SWAPfile.write((const char*) machine->mainMemory[physicalPageReplaced*PageSize], PageSize);
 	otherThread->space->getPageTable()[virtualPageReplaced].physicalPage = nextFreeSWAPFrame;
@@ -710,7 +710,7 @@ void ExceptionHandler(ExceptionType whichException)
 			}
 			else // the page is valid (IS IN THE MAIN MEMORY/PAGE TABLE)
 			{
-				DEBUG('u', "Valid bit false, updating the TLB\n");
+				DEBUG('u', "Valid bit true, updating the TLB\n");
 				// Simply add to the tlb
 				updateTLB(virtualPageNumber);
 			}
