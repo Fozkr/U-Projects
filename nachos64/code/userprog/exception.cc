@@ -82,6 +82,13 @@ void updateTLB(unsigned int virtualPageNumber)
 		machine->tlb[machine->tlbIterator].use = false;
 		machine->tlbIterator = (machine->tlbIterator + 1) % TLBSize;
 	}
+	
+	// next, save the changes in that tlb page to the pageTable
+	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].physicalPage = machine->tlb[machine->tlbIterator].physicalPage;
+	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].valid = machine->tlb[machine->tlbIterator].valid;
+	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].use = machine->tlb[machine->tlbIterator].use;
+	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].dirty = machine->tlb[machine->tlbIterator].dirty;
+	
 	// finally it finds a page "not in use", so add there the one that caused the fault
 	DEBUG('u', "Moving page to tlb[%d], virtual page number: %d\n", machine->tlbIterator, virtualPageNumber);
 	machine->tlb[machine->tlbIterator].virtualPage = virtualPageNumber;
@@ -95,11 +102,18 @@ void updateTLB(unsigned int virtualPageNumber)
 // Store page in SWAP file
 void storeInSWAP(Thread* otherThread, unsigned int physicalPageReplaced, unsigned int virtualPageReplaced)
 {
+	DEBUG('u', "Storing in SWAP, physical page: %d, virtual page: %d\n", physicalPageReplaced, virtualPageReplaced);
 	unsigned int nextFreeSWAPFrame = machine->SWAPmap->Find(); // For now we will assume the SWAP never gets full
-	std::ofstream SWAPfile; //FIX THIS
-	SWAPfile.seekp(nextFreeSWAPFrame*PageSize);
-	SWAPfile.write((const char*) machine->mainMemory[physicalPageReplaced*PageSize], PageSize);
+	machine->SWAP->WriteAt((const char*) &(machine->mainMemory[physicalPageReplaced*PageSize]), PageSize, nextFreeSWAPFrame*PageSize);
 	otherThread->space->getPageTable()[virtualPageReplaced].physicalPage = nextFreeSWAPFrame;
+}
+
+// Retrieve page from SWAP file
+void readFromSWAP(int nextFreeFrame, unsigned int virtualPageNumber, int oldSWAPframe)
+{
+	DEBUG('u', "Reading from SWAP, physical page: %d, virtual page: %d, oldSWAPframe: %d\n", nextFreeFrame, virtualPageNumber, oldSWAPframe);
+	machine->SWAP->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, currentThread->space->getPageTable()[virtualPageNumber].physicalPage * PageSize);
+	machine->SWAPmap->Clear(oldSWAPframe);
 }
 
 // System call #0
@@ -641,10 +655,8 @@ void ExceptionHandler(ExceptionType whichException)
 			DEBUG('u', ", readOnly: %d\n", readOnlyBit);
 			if(!validBit) // if the page is not valid (IS NOT IN MAIN MEMORY/PAGE TABLE)
 			{
-				//DEBUG('u', "valid bit false\n");
 				// It is code, initData, uninitData or stack, not in memory, all of them need to reserve space
 				DEBUG('u', "Reserving space...\n");
-				// if it is uninitData or Stack, it must not be loaded from memory, just reserve space
 				if(mainMemoryMap->NumClear() == 0) // if there are no free frames
 				{
 					// Replace a frame, first tell the thread using that physical page to make that virtual page not valid
@@ -652,15 +664,18 @@ void ExceptionHandler(ExceptionType whichException)
 					Thread* otherThread = (Thread*) machine->invertedTable[machine->mainMemoryIterator];
 					unsigned int virtualPageReplaced = machine->invertedTableVP[machine->mainMemoryIterator];
 					otherThread->space->getPageTable()[virtualPageReplaced].valid = false;
+					
 					// If the page was in the tlb, remove it from there, and also update its dirty bit
 					unsigned short posInTLB = 0;
 					while(posInTLB < TLBSize && machine->tlb[posInTLB].physicalPage != machine->mainMemoryIterator)
 						++posInTLB;
 					if(posInTLB < 4) // it found it in the tlb
 						otherThread->space->getPageTable()[virtualPageReplaced].dirty = machine->tlb[posInTLB].dirty;
+						
 					// If that page is dirty (bit), then save it in the SWAP
 					if(otherThread->space->getPageTable()[virtualPageReplaced].dirty)
 						storeInSWAP(otherThread, machine->mainMemoryIterator, virtualPageReplaced);
+						
 					// Then, clear the position and update mainMemoryIterator
 					mainMemoryMap->Clear(machine->mainMemoryIterator);
 					machine->mainMemoryIterator = (machine->mainMemoryIterator + 1) % NumPhysPages;
@@ -668,17 +683,19 @@ void ExceptionHandler(ExceptionType whichException)
 				
 				// Now store in the main memory
 				int nextFreeFrame = mainMemoryMap->Find();
-				//bzero(machine->mainMemory[nextFreeFrame*PageSize], PageSize); // clean frame
+				// just in case it is in SWAP, got to save that frame before overwriting it with nextFreeFrame
+				int oldSWAPframe = currentThread->space->getPageTable()[virtualPageNumber].physicalPage;
+				bzero(&machine->mainMemory[nextFreeFrame*PageSize], PageSize); // clean frame
 				currentThread->space->getPageTable()[virtualPageNumber].physicalPage = nextFreeFrame;
 				currentThread->space->getPageTable()[virtualPageNumber].valid = true;
+				
 				// Next add to the tlb
 				updateTLB(virtualPageNumber);
 				
-				// if it is readOnly, it is code, if the pagenumber is < than numPagesCode+numPagesInitData, then it is initData
+				// If it is readOnly, it is code, if the pagenumber is < than numPagesCode+numPagesInitData, then it is initData
+				// If it is either code or initData, the page has not been loaded to memory, it must be loaded from disk
 				if(readOnlyBit || virtualPageNumber < (currentThread->space->getNumPagesCode() + currentThread->space->getNumPagesInitData())) // if the page is not dirty
 				{
-					//DEBUG('u', "dirty bit false\n");
-					// The readOnly page has not been loaded to memory, it must be loaded from disk
 					DEBUG('u', "It is code or initData, loading from disk to main memory...\n");
 					OpenFile* executable = fileSystem->Open(currentThread->space->getFilename());
 					NoffHeader noffH;
@@ -686,19 +703,17 @@ void ExceptionHandler(ExceptionType whichException)
 					//if ((noffH.noffMagic != NOFFMAGIC) && (WordToHost(noffH.noffMagic) == NOFFMAGIC))
 					//	SwapHeader(&noffH);
 					ASSERT(noffH.noffMagic == NOFFMAGIC);
-					executable->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, noffH.code.inFileAddr + (virtualPageNumber * PageSize));
+					//executable->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, noffH.code.inFileAddr + (virtualPageNumber * PageSize));
+					DEBUG('y', "Reading page %d. Result: %d\n", virtualPageNumber, executable->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, noffH.code.inFileAddr + (virtualPageNumber * PageSize)));
 					delete executable;
 				}
 				else // it is uninitData or stack
 				{
-					if(dirtyBit) //it is dirty
+					if(dirtyBit) // if it is dirty, must read from SWAP
 					{
 						DEBUG('u', "dirty bit true!!!\n");
-						// The readOnly page has not been loaded to memory, it must be loaded from disk
 						DEBUG('u', "It is uninitData or stack, loading from SWAP to main memory...\n");
-						OpenFile* SWAPfile = fileSystem->Open("SWAP");
-						SWAPfile->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, currentThread->space->getPageTable()[virtualPageNumber].physicalPage * PageSize);
-						delete SWAPfile;
+						readFromSWAP(nextFreeFrame, virtualPageNumber, oldSWAPframe);
 					}
 				}
 				
@@ -710,8 +725,8 @@ void ExceptionHandler(ExceptionType whichException)
 			}
 			else // the page is valid (IS IN THE MAIN MEMORY/PAGE TABLE)
 			{
-				DEBUG('u', "Valid bit true, updating the TLB\n");
 				// Simply add to the tlb
+				DEBUG('u', "Valid bit true, updating the TLB\n");
 				updateTLB(virtualPageNumber);
 			}
 			//ASSERT(false);

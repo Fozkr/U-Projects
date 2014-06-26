@@ -89,7 +89,7 @@ AddrSpace::AddrSpace(OpenFile* executable)
 	executableFilename = new char[32]; // 32 for now
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, sizeOfCode + sizeOfDataStack);
-    DEBUG('a', "code: %d, initData: %d, uninitData: %d\n", divRoundUp(noffH.code.size, PageSize), divRoundUp(noffH.initData.size, PageSize), divRoundUp(noffH.uninitData.size, PageSize));
+    DEBUG('w', "code: %d, initData: %d, uninitData: %d\n", divRoundUp(noffH.code.size, PageSize), divRoundUp(noffH.initData.size, PageSize), divRoundUp(noffH.uninitData.size, PageSize));
 	// first, set up the translation
     pageTable = new TranslationEntry[numPages];
 /*
@@ -196,7 +196,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 	numPagesCode = otherSpace->numPagesCode;
 	numPagesDataStack = otherSpace->numPagesDataStack;
     numPagesInitData = otherSpace->numPagesInitData;
-    numPages = numPagesCode + numPagesDataStack;
+    numPages = otherSpace->numPages;
 	DEBUG('a', "Copying address space, num pages: %d\n", numPages);
 	unsigned int i;
     pageTable = new TranslationEntry[numPages];
@@ -256,7 +256,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 #endif
 		pageTable[i].use = false;
 		pageTable[i].dirty = false;
-		if(i < numPagesCode)
+		if(i < numPagesCode-1)
 			pageTable[i].readOnly = true;	// if the code segment is entirely on a separate page, we can set its pages to be read-only
 		else
 			pageTable[i].readOnly = false;
@@ -289,6 +289,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
 
 AddrSpace::~AddrSpace()
 {
+	DEBUG('a', "Entering destructor of AddrSpace\n");
 	// If there are no child threads associated to this thread, delete
 	// the whole adress space. Otherwise, delete only the stack.
 	if(currentThread->openedFilesTable->getUsage() > 1) //there are child threads, delete the stack only
@@ -303,8 +304,11 @@ AddrSpace::~AddrSpace()
 			if(pageTable[page].physicalPage >=0 && mainMemoryMap->Test(pageTable[page].physicalPage))
 				mainMemoryMap->Clear(pageTable[page].physicalPage);
 	}
-	delete pageTable;
+	DEBUG('a', "Deleting pageTable: %li\n", (long) pageTable);
+	delete[] pageTable;
+	DEBUG('a', "Deleting executableFilename\n");
 	delete[] executableFilename;
+	DEBUG('a', "Done\n");
 }
 
 //----------------------------------------------------------------------
@@ -344,9 +348,10 @@ void AddrSpace::InitRegisters()
 //	to this address space, that needs saving.
 //----------------------------------------------------------------------
 
-void AddrSpace::SaveState() 
+void AddrSpace::SaveState()
 {
 #ifdef VM
+	DEBUG('u', "SAVESTATE\n");
 	for(unsigned int i=0; i<TLBSize; ++i)
 	{
 		pageTable[machine->tlb[i].virtualPage].physicalPage = machine->tlb[i].physicalPage;
@@ -354,6 +359,7 @@ void AddrSpace::SaveState()
 		pageTable[machine->tlb[i].virtualPage].use = machine->tlb[i].use;
 		pageTable[machine->tlb[i].virtualPage].dirty = machine->tlb[i].dirty;
 	}
+	DEBUG('u', "SAVEDSTATE\n");
 #endif
 }
 
@@ -371,6 +377,7 @@ void AddrSpace::RestoreState()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 #else
+	DEBUG('u', "RESTORESTATE\n");
 	for(unsigned int i=0; i<TLBSize; i++)
 	{
 		machine->tlb[i].virtualPage = -1;
