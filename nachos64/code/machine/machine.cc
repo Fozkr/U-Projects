@@ -105,6 +105,7 @@ Machine::~Machine()
 		delete SWAP;
 	if(SWAPmap != NULL)
 		delete SWAPmap;
+	remove("SWAP");
 }
 
 //----------------------------------------------------------------------
