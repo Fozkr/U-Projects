@@ -77,18 +77,24 @@ void readOrWriteVirtualMemory(bool read, char* array, long virtualAdress)
 void updateTLB(unsigned int virtualPageNumber)
 {
 	DEBUG('u', "Updating the TLB\n");
-	// Simply add to the tlb
+	// Second chance algorithm (used although not necessary)
 	while(machine->tlb[machine->tlbIterator].use) // while it finds pages "in use", set that to false
 	{
 		machine->tlb[machine->tlbIterator].use = false;
 		machine->tlbIterator = (machine->tlbIterator + 1) % TLBSize;
 	}
 	
-	// next, save the changes in that tlb page to the exiting pageTable
-	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].physicalPage = machine->tlb[machine->tlbIterator].physicalPage;
-	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].valid = machine->tlb[machine->tlbIterator].valid;
-	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].use = machine->tlb[machine->tlbIterator].use;
-	currentThread->space->getPageTable()[machine->tlb[machine->tlbIterator].virtualPage].dirty = machine->tlb[machine->tlbIterator].dirty;
+	// next, save the changes in that victim tlb page to the exiting pageTable
+	// not assuming that all tlb pages are being used by currentThread...
+	if(machine->tlb[machine->tlbIterator].physicalPage >= 0) // if it contains a valid page (exception: when starting nachos)
+	{
+		Thread* thr = (Thread*) machine->invertedTable[machine->tlb[machine->tlbIterator].physicalPage];
+		unsigned int VP = machine->invertedTableVP[machine->tlb[machine->tlbIterator].physicalPage];
+		thr->space->getPageTable()[VP].physicalPage = machine->tlb[machine->tlbIterator].physicalPage;
+		thr->space->getPageTable()[VP].valid = machine->tlb[machine->tlbIterator].valid;
+		thr->space->getPageTable()[VP].use = machine->tlb[machine->tlbIterator].use;
+		thr->space->getPageTable()[VP].dirty = machine->tlb[machine->tlbIterator].dirty;
+	}
 	
 	// finally, after finding a page "not in use", add there the one that caused the page fault
 	DEBUG('u', "Moving page to tlb[%d], virtual page number: %d\n", machine->tlbIterator, virtualPageNumber);
@@ -105,14 +111,14 @@ void storeInSWAP(Thread* otherThread, unsigned int physicalPageReplaced, unsigne
 {
 	DEBUG('u', "Storing in SWAP, physical page: %d, virtual page: %d\n", physicalPageReplaced, virtualPageReplaced);
 	unsigned int nextFreeSWAPFrame = machine->SWAPmap->Find(); // For now we will assume the SWAP never gets full
-	machine->SWAP->WriteAt((const char*) &(machine->mainMemory[physicalPageReplaced*PageSize]), PageSize, nextFreeSWAPFrame*PageSize);
-	otherThread->space->getPageTable()[virtualPageReplaced].physicalPage = nextFreeSWAPFrame; //for later, when reloading
+	machine->SWAP->WriteAt(&(machine->mainMemory[physicalPageReplaced*PageSize]), PageSize, nextFreeSWAPFrame*PageSize);
+	otherThread->space->getPageTable()[virtualPageReplaced].physicalPage = nextFreeSWAPFrame; // save it for later, when reloading from SWAP
 }
 
 // Retrieve page from SWAP file
 void readFromSWAP(int nextFreeFrame, unsigned int virtualPageNumber, int oldSWAPframe)
 {
-	DEBUG('u', "Reading from SWAP, physical page: %d, virtual page: %d, oldSWAPframe: %d\n", nextFreeFrame, virtualPageNumber, oldSWAPframe);
+	DEBUG('u', "Reading from SWAP, to physical page: %d, virtual page: %d, oldSWAPframe: %d\n", nextFreeFrame, virtualPageNumber, oldSWAPframe);
 	machine->SWAP->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, oldSWAPframe * PageSize);
 	machine->SWAPmap->Clear(oldSWAPframe);
 }
@@ -122,38 +128,38 @@ void readFromSWAP(int nextFreeFrame, unsigned int virtualPageNumber, int oldSWAP
 void replaceMainMemoryFrame()
 {
 	DEBUG('u', "REPLACING FRAME: ");
-	
-	// Replace a frame, first find one with the "use bit" on false 
-	Thread* thr = (Thread*) machine->invertedTable[machine->mainMemoryIterator];
-	while(thr->space->getPageTable()[machine->invertedTableVP[machine->mainMemoryIterator]].use)
+	// Replace a frame, first find one with the "use bit" on false (second chance)
+	Thread* thr = (Thread*) machine->invertedTable[machine->mainMemoryIterator]; // to iterate through the pages
+	unsigned int VP = machine->invertedTableVP[machine->mainMemoryIterator];
+	// Second chance replacement algorithm
+	while(thr->space->getPageTable()[VP].use)
 	{
-		// while it finds pages "in use", set that to false
-		thr->space->getPageTable()[machine->invertedTableVP[machine->mainMemoryIterator]].use = false;
-		machine->tlbIterator = (machine->tlbIterator + 1) % TLBSize;
+		// while it finds pages "in use", set that use bit to false
+		thr->space->getPageTable()[VP].use = false;
+		machine->mainMemoryIterator = (machine->mainMemoryIterator + 1) % NumPhysPages;
 		thr = (Thread*) machine->invertedTable[machine->mainMemoryIterator];
+		VP = machine->invertedTableVP[machine->mainMemoryIterator];
 	}
 	DEBUG('u', "%d\n", machine->mainMemoryIterator);
 	
 	// Then tell the thread using that physical page to make that virtual page not valid
-	Thread* otherThread = (Thread*) machine->invertedTable[machine->mainMemoryIterator];
-	unsigned int virtualPageReplaced = machine->invertedTableVP[machine->mainMemoryIterator];
-	otherThread->space->getPageTable()[virtualPageReplaced].valid = false;
-	otherThread->space->getPageTable()[virtualPageReplaced].physicalPage = -1;
-	otherThread->space->getPageTable()[virtualPageReplaced].use = false;
+	thr->space->getPageTable()[VP].valid = false;
+	thr->space->getPageTable()[VP].physicalPage = -1;
 
-	// If that page was in the tlb, remove it from there, but also update its dirty bit before removing
+	// If that page was in the tlb, remove it from there, but also update its dirty bit before removing!
 	unsigned short posInTLB = 0;
 	while(posInTLB < TLBSize && machine->tlb[posInTLB].physicalPage != machine->mainMemoryIterator)
 		++posInTLB;
-	if(posInTLB < 4) // it found it in the tlb
-		otherThread->space->getPageTable()[virtualPageReplaced].dirty = machine->tlb[posInTLB].dirty;
+	if(posInTLB < 4) // it found it in the tlb, update dirty bit
+		thr->space->getPageTable()[VP].dirty = machine->tlb[posInTLB].dirty;
 	
 	// If that page is dirty (bit), then save it in the SWAP
-	if(otherThread->space->getPageTable()[virtualPageReplaced].dirty)
-		storeInSWAP(otherThread, machine->mainMemoryIterator, virtualPageReplaced);
+	if(thr->space->getPageTable()[VP].dirty)
+		storeInSWAP(thr, machine->mainMemoryIterator, VP);
 	
 	// Then, clear the position and update mainMemoryIterator
 	mainMemoryMap->Clear(machine->mainMemoryIterator);
+	//bzero(&(machine->mainMemory[machine->mainMemoryIterator*PageSize]), PageSize); // clean new frame
 	machine->mainMemoryIterator = (machine->mainMemoryIterator + 1) % NumPhysPages;
 }
 
@@ -176,6 +182,7 @@ void Nachos_Halt()
 void Nachos_Exit()
 {
 	DEBUG('u', "Exiting through system call, pid: %d\n", currentThread->pid);
+	DEBUG('x', "Exit status: %d\n", machine->ReadRegister(4));
 	
 	// First wait for the child processes to finish
 	DEBUG('u', "Waiting for child processes\n");
@@ -685,15 +692,69 @@ void ExceptionHandler(ExceptionType whichException)
 			returnFromSystemCall(); //Update the pc registers
 			break;
 		case PageFaultException:
-			DEBUG('u', "-Page Fault Exception detected-\nVirtual adress: %d", machine->ReadRegister(39));
+			DEBUG('u', "---Page Fault Exception detected---\nVirtual adress: %d", machine->ReadRegister(39));
 			virtualPageNumber = machine->ReadRegister(39)/PageSize;
-			DEBUG('u', ", Page number: %d\n", virtualPageNumber);
+			DEBUG('u', ", Page number: %d", virtualPageNumber);
 			validBit = currentThread->space->getPageTable()[virtualPageNumber].valid;
-			DEBUG('u', "Bit validez: %d", validBit);
+			DEBUG('u', ", Bit validez: %d", validBit);
 			dirtyBit = currentThread->space->getPageTable()[virtualPageNumber].dirty;
-			DEBUG('u', ", Bit de suciedad: %d", dirtyBit);
+			DEBUG('u', ", Bit suciedad: %d", dirtyBit);
 			readOnlyBit = currentThread->space->getPageTable()[virtualPageNumber].readOnly;
-			DEBUG('u', ", readOnly: %d\n", readOnlyBit);
+			DEBUG('u', ", Bit readOnly: %d\n", readOnlyBit);
+			/* Suggested code (by website and pagefault.jpg) that works */
+			/* Page is not in TLB */
+			/* Is the page in the page table? (assuming that means "is it in main memory?"...) */
+			if(!validBit) // the page is not in main memory
+			{
+				/* Is there a free frame in main memory? */
+				DEBUG('u', "Reserving space in main memory...\n");
+				if(mainMemoryMap->NumClear() == 0) // if there are no free frames
+					replaceMainMemoryFrame();
+				int nextFreeFrame = mainMemoryMap->Find(); // to read into from SWAP, or from executable file
+				
+				/* Is the faulting page dirty? */
+				if(dirtyBit) // the page is dirty
+				{
+					/* Read from SWAP, update pageTable, update TLB and exit */
+					int oldSWAPframe = currentThread->space->getPageTable()[virtualPageNumber].physicalPage; // to read from SWAP
+					readFromSWAP(nextFreeFrame, virtualPageNumber, oldSWAPframe);
+				}
+				else // the page is not dirty
+				{
+					/* Is the page of code or initialized data? */
+					if(readOnlyBit || virtualPageNumber < (currentThread->space->getNumPagesCode() + currentThread->space->getNumPagesInitData())) // the page is either code or initData
+					{
+						/* Read from executable file, update pageTable, update TLB and exit */
+						DEBUG('u', "The page is either code or initData, loading from disk to main memory...\n");
+						OpenFile* executable = fileSystem->Open(currentThread->space->getFilename());
+						NoffHeader noffH;
+						executable->ReadAt((char*) &noffH, sizeof(noffH), 0);
+						ASSERT(noffH.noffMagic == NOFFMAGIC);
+						executable->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, noffH.code.inFileAddr + (virtualPageNumber * PageSize));
+						//DEBUG('u', "Reading vpage %d to ppage %d. Result: %d bytes read\n", virtualPageNumber, nextFreeFrame, executable->ReadAt(&(machine->mainMemory[nextFreeFrame * PageSize]), PageSize, noffH.code.inFileAddr + (virtualPageNumber * PageSize)));
+						delete executable;
+					}
+					else // it is either uninitData or stack
+						bzero(&(machine->mainMemory[nextFreeFrame*PageSize]), PageSize); /* Clean frame, update pageTable, update TLB and exit */
+				}
+				// Update pageTable
+				currentThread->space->getPageTable()[virtualPageNumber].physicalPage = nextFreeFrame;
+				currentThread->space->getPageTable()[virtualPageNumber].valid = true; // ***also done in updateTLB()
+				
+				// Store the data in the inverted table (because we just added a page to the main memory)
+				DEBUG('u', "Storing Thread* %li in inverted table[%d] with virtual page: %d\n", (long) currentThread, nextFreeFrame, virtualPageNumber);
+				machine->invertedTable[nextFreeFrame] = (long) currentThread;
+				machine->invertedTableVP[nextFreeFrame] = virtualPageNumber;
+				DEBUG('u', "Ok\n");
+			}
+			/* Is the TLB full? if it is, replace a page, then add the faulting page and exit */
+			// If the page was indeed in main memory, simply add to the tlb... always, add to the tlb
+			updateTLB(virtualPageNumber);
+			break;
+			
+			/* end of suggested code */
+			/* ********************************************************************************************************************************* */
+			/* Original code (that did not work)
 			if(!validBit) // if the page is not valid (IS NOT IN MAIN MEMORY/PAGE TABLE)
 			{
 				// It is code, initData, uninitData or stack, not in memory, all of them need to reserve space
@@ -749,6 +810,9 @@ void ExceptionHandler(ExceptionType whichException)
 				// Simply add to the tlb
 				updateTLB(virtualPageNumber);
 			}
+			*/
+			/* end of original code */
+			
 			//ASSERT(false);
 			break;
 		default:

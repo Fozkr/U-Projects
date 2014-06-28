@@ -89,50 +89,11 @@ AddrSpace::AddrSpace(OpenFile* executable)
 	executableFilename = new char[32]; // 32 for now
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n", numPages, sizeOfCode + sizeOfDataStack);
-    DEBUG('w', "code: %d, initData: %d, uninitData: %d\n", divRoundUp(noffH.code.size, PageSize), divRoundUp(noffH.initData.size, PageSize), divRoundUp(noffH.uninitData.size, PageSize));
+    DEBUG('w', "code: %d, initData: %d, uninitData: %d, stack: 8, total: %d\n", divRoundUp(noffH.code.size, PageSize), divRoundUp(noffH.initData.size, PageSize), divRoundUp(noffH.uninitData.size, PageSize), numPages);
 	// first, set up the translation
     pageTable = new TranslationEntry[numPages];
-    DEBUG('w', "pageTable original adress: %d\n", (long) pageTable);
-/*
-    // First the code
-    for(i=0; i<numPagesCode; ++i) // reserves pages for uninitData and stack too
-    {
-		pageTable[i].virtualPage = i;
-		// Added on lab 9
-#ifndef VM
-		int nextFreePhysicalPage = mainMemoryMap->Find();
-		DEBUG('a', "nextFreePhysicalPage: %d\n", nextFreePhysicalPage);
-		pageTable[i].physicalPage = nextFreePhysicalPage;
-		pageTable[i].valid = true;
-#else
-		pageTable[i].physicalPage = -1;
-		pageTable[i].valid = false;
-#endif
-		pageTable[i].use = false;
-		pageTable[i].dirty = false;
-		pageTable[i].readOnly = true;  // if the code segment was entirely on 
-										// a separate page, we can set its 
-										// pages to be read-only
-    }
-    // Second, the data and stack
-    for(; i<numPages; ++i) // reserves pages for uninitData and stack too
-    {
-		pageTable[i].virtualPage = i;
-		// Added on lab 9
-#ifndef VM
-		int nextFreePhysicalPage = mainMemoryMap->Find();
-		DEBUG('a', "nextFreePhysicalPage: %d\n", nextFreePhysicalPage);
-		pageTable[i].physicalPage = nextFreePhysicalPage;
-		pageTable[i].valid = true;
-#else
-		pageTable[i].physicalPage = -1;
-		pageTable[i].valid = false;
-#endif
-		pageTable[i].use = false;
-		pageTable[i].dirty = false;
-		pageTable[i].readOnly = false;
-    }
-*/
+    //DEBUG('w', "pageTable original adress: %d\n", (long) pageTable);
+
 	// Reserve pages
     for(i=0; i<numPages; ++i)
     {
@@ -163,8 +124,6 @@ AddrSpace::AddrSpace(OpenFile* executable)
     if(noffH.code.size > 0)
     {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", noffH.code.virtualAddr, noffH.code.size);
-        //executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]), noffH.code.size, noffH.code.inFileAddr);
-		//numPagesCode = divRoundUp(noffH.code.size, PageSize);
 		for(i=0; i<numPagesCode; ++i)
 		{
 			int physicalPage = pageTable[i].physicalPage;
@@ -174,8 +133,6 @@ AddrSpace::AddrSpace(OpenFile* executable)
     if(noffH.initData.size > 0)
     {
         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", noffH.initData.virtualAddr, noffH.initData.size);
-        //executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),noffH.initData.size, noffH.initData.inFileAddr);
-        //numPagesInitData = divRoundUp(noffH.initData.size, PageSize);
 		for(; i<numPagesInitData; ++i)
 		{
 			int physicalPage = pageTable[i].physicalPage;
@@ -204,45 +161,7 @@ AddrSpace::AddrSpace(AddrSpace* otherSpace)
     DEBUG('w', "pageTable copy original adress: %d\n", (long) pageTable);
     executableFilename = new char[32]; // 32 for now
     strcpy(executableFilename, otherSpace->getFilename());
-/*
-    // First the code
-    for(i=0; i<numPagesCode; ++i)
-    {
-		DEBUG('a', "Copying code, page: %d\n", i);
-		pageTable[i].virtualPage = otherSpace->pageTable[i].virtualPage;
-		// Added on lab 9
-#ifndef VM
-		pageTable[i].physicalPage = otherSpace->pageTable[i].physicalPage;
-		pageTable[i].valid = true;
-#else
-		pageTable[i].physicalPage = -1;
-		pageTable[i].valid = false;
-#endif
-		pageTable[i].use = false;
-		pageTable[i].dirty = false;
-		pageTable[i].readOnly = true;  // if the code segment was entirely on 
-										// a separate page, we could set its 
-										// pages to be read-only
-    }
-    for(; i<(numPages - UserStackSize/PageSize); ++i) // reserves pages for uninitData and stack too
-    {
-		DEBUG('a', "Copying  inidata and uninitdata, page: %d\n", i);
-		pageTable[i].virtualPage = otherSpace->pageTable[i].virtualPage;
-		// Added on lab 9
-#ifndef VM
-		pageTable[i].physicalPage = otherSpace->pageTable[i].physicalPage;
-		pageTable[i].valid = true;
-#else
-		pageTable[i].physicalPage = -1;
-		pageTable[i].valid = false;
-#endif
-		pageTable[i].use = false;
-		pageTable[i].dirty = false;
-		pageTable[i].readOnly = false;  // if the code segment was entirely on 
-										// a separate page, we could set its 
-										// pages to be read-only
-    }
-*/
+
 	// Reserve pages
 	for(i=0; i<(numPages - UserStackSize/PageSize); ++i)
     {
@@ -353,7 +272,7 @@ void AddrSpace::InitRegisters()
 void AddrSpace::SaveState()
 {
 #ifdef VM
-	DEBUG('u', "SAVESTATE\n");
+	//DEBUG('u', "SAVESTATE\n");
 	for(unsigned int i=0; i<TLBSize; ++i)
 	{
 		pageTable[machine->tlb[i].virtualPage].physicalPage = machine->tlb[i].physicalPage;
@@ -379,7 +298,7 @@ void AddrSpace::RestoreState()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 #else
-	DEBUG('u', "RESTORESTATE\n");
+	//DEBUG('u', "RESTORESTATE\n");
 	for(unsigned int i=0; i<TLBSize; i++)
 	{
 		machine->tlb[i].virtualPage = -1;

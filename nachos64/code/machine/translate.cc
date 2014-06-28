@@ -245,6 +245,7 @@ ExceptionType Machine::Translate(int virtAddr, int* physAddr, int size, bool wri
 		return BusErrorException;
     }
     entry->use = true;		// set the use, dirty bits
+    currentThread->space->getPageTable()[vpn].use = true; //added
     if (writing)
 		entry->dirty = true;
     *physAddr = pageFrame * PageSize + offset;
